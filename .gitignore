@@ -16,3 +16,4 @@
 .idea
 go.sum
 config-yaml/config-local.yaml
+tccbot-backend
