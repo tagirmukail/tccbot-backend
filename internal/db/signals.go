@@ -2,6 +2,8 @@ package db
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -66,16 +68,44 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
 //	return nil, nil
 //}
 
-func (db *DB) GetSignalsByTs(binSize models.BinSize, ts []time.Time) ([]*models.Signal, error) {
+func (db *DB) GetSignalsByTs(
+	signalTypes []models.SignalType, binSizes []models.BinSize, ts []time.Time,
+) ([]*models.Signal, error) {
 	var result = make([]*models.Signal, 0, len(ts)*2)
 
 	if len(ts) == 0 {
 		return result, nil
 	}
-	query, args, err := sqlx.In(`SELECT * FROM signals WHERE bin=? AND timestamp IN (?)`, binSize, ts)
+
+	var sigQueryBuild = strings.Builder{}
+	for i, sigT := range signalTypes {
+		sigQueryBuild.WriteString("'")
+		sigQueryBuild.WriteString(sigT.String())
+		sigQueryBuild.WriteString("'")
+		if i != len(signalTypes)-1 {
+			sigQueryBuild.WriteString(",")
+		}
+	}
+	var binQueryBuild = strings.Builder{}
+	for i, binS := range binSizes {
+		binQueryBuild.WriteString("'")
+		binQueryBuild.WriteString(binS.String())
+		binQueryBuild.WriteString("'")
+		if i != len(binSizes)-1 {
+			binQueryBuild.WriteString(",")
+		}
+	}
+
+	// fixme: error - Cannot encode int64 into oid 16472 - int64 must implement Encoder or be converted to a string
+	query, args, err := sqlx.In(
+		fmt.Sprintf(
+			`SELECT * FROM signals WHERE signal_t IN (%s) AND bin IN (%s) AND timestamp IN (?)`,
+			sigQueryBuild.String(), binQueryBuild.String()),
+		ts)
 	if err != nil {
 		return nil, err
 	}
+
 	query = db.db.Rebind(query)
 	err = db.db.Select(&result, query, args...)
 	if err != nil {

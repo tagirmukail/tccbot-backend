@@ -66,7 +66,7 @@ func (t *SignalType) Scan(value interface{}) error {
 }
 
 func (t *SignalType) Value() (driver.Value, error) {
-	return t.String(), nil
+	return t, nil
 }
 
 func ToSignalType(sigType string) (SignalType, error) {

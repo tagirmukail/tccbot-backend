@@ -11,6 +11,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
+// TODO добавить проверку на уже инициализированые по timestamp сигналы
+
 func (s *Strategies) SignalsInit() error {
 	for _, binSize := range s.cfg.Strategies.BinSizes {
 		err := s.binProcess(binSize)
@@ -55,7 +57,7 @@ func (s *Strategies) binProcess(binSize string) error {
 	var (
 		prevMACDHistVals []float64
 	)
-	// TODO test this algorithm
+
 	var step int
 	for i := len(candles) - s.cfg.Strategies.MacdSigCount; i < len(candles); i++ {
 		// need for save signal into db

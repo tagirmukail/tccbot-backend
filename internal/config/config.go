@@ -23,9 +23,10 @@ type DB struct {
 }
 
 type StrategiesConfig struct {
+	EnableBolingerBand bool
+	EnableMACD         bool
 	BinSizes           []string
 	RetryProcessCount  int
-	EnableBolingerBand bool
 	GetCandlesCount    int
 	BBLastCandlesCount int
 	RsiCount           int
@@ -131,11 +132,12 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	var strategies StrategiesConfig
 	strategiesExist := viper.InConfig("strategies")
 	if strategiesExist {
+		strategies.EnableBolingerBand = viper.GetBool("strategies.enable_bb")
+		strategies.EnableMACD = viper.GetBool("strategies.enable_macd")
 		strategies.BinSizes = viper.GetStringSlice("strategies.bin_sizes")
 		strategies.RetryProcessCount = viper.GetInt("strategies.retry_process_count")
 		strategies.GetCandlesCount = viper.GetInt("strategies.get_candles_count")
 		strategies.BBLastCandlesCount = viper.GetInt("strategies.bb_last_candles_count")
-		strategies.EnableBolingerBand = viper.GetBool("strategies.enable_bb")
 		strategies.MacdFastCount = viper.GetInt("strategies.macd_fast_count")
 		strategies.MacdSlowCount = viper.GetInt("strategies.macd_slow_count")
 		strategies.MacdSigCount = viper.GetInt("strategies.macd_sig_count")
@@ -160,15 +162,19 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		}
 	} else {
 		// default
+		strategies.EnableBolingerBand = true
 		strategies.BinSizes = []string{"5m"}
 		strategies.RetryProcessCount = 5
-		strategies.EnableBolingerBand = true
 		strategies.GetCandlesCount = 20
 		strategies.BBLastCandlesCount = 4
 		strategies.RsiCount = 14
 		strategies.MacdFastCount = 12
 		strategies.MacdSlowCount = 26
 		strategies.MacdSigCount = 9
+	}
+
+	if !strategies.EnableBolingerBand && !strategies.EnableMACD {
+		logrus.Fatal("all strategies disabled, enable any strategy")
 	}
 
 	cfg := &GlobalConfig{

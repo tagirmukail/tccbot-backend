@@ -23,7 +23,7 @@ type DBManager interface {
 	SaveSignal(data models.Signal) (int64, error)
 	//GetSignalsByBinSize(binSize models.BinSize) ([]*models.Signal, error)
 	//GetLastSignals(binSize models.BinSize, count int) ([]*models.Signal, error)
-	GetSignalsByTs(binSize models.BinSize, ts []time.Time) ([]*models.Signal, error)
+	GetSignalsByTs(signalTypes []models.SignalType, binSizes []models.BinSize, ts []time.Time) ([]*models.Signal, error)
 	// CandlesWithSignals
 	//GetCandleWithSignals(id int64) (*models.CandleWithSignals, error)
 	//GetLastCandlesWithSignals(theme types.Theme, n int, limit int) ([]*models.CandleWithSignals, error)

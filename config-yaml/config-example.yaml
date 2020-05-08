@@ -33,8 +33,9 @@ exchanges_access:
     secret: secret
 
 strategies:
-  enable_bb: true # bolinger band
-  bin_sizes: ["5m","1h"]
+  enable_bb: true # enable bolinger band strategy
+  enable_macd: true # enable macd strategy
+  bin_sizes: ["5m","1h"] # 5m,1h,1d
   retry_process_count: 5
   bb_last_candles_count: 4
   get_candles_count: 30

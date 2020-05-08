@@ -63,7 +63,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	log, err := logger.New(logLevel, logDir, &logrus.TextFormatter{DisableColors: false, ForceColors: true})
+	log, err := logger.New(logLevel, logDir, &logrus.TextFormatter{DisableColors: false, ForceColors: true, FullTimestamp: true})
 	if err != nil {
 		logrus.Fatal(err)
 	}

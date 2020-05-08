@@ -66,3 +66,27 @@ func (s *Strategies) checkCloses(candles []bitmex.TradeBuck) error {
 	}
 	return nil
 }
+
+func (s *Strategies) fetchMacdHistVals(signals []*models.Signal) []float64 {
+	var result []float64
+	for _, signal := range signals {
+		if signal.MACDHistogramValue == 0 {
+			continue
+		}
+		result = append(result, signal.MACDHistogramValue)
+	}
+	return result
+}
+
+func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int {
+	switch size {
+	case models.Bin5m:
+		return 6
+	case models.Bin1h:
+		return 4
+	case models.Bin1d:
+		return 3
+	default:
+		return 0
+	}
+}
