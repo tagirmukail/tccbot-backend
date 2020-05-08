@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
@@ -22,10 +23,15 @@ type DB struct {
 }
 
 type StrategiesConfig struct {
+	BinSizes           []string
 	RetryProcessCount  int
 	EnableBolingerBand bool
 	GetCandlesCount    int
 	BBLastCandlesCount int
+	RsiCount           int
+	MacdFastCount      int
+	MacdSlowCount      int
+	MacdSigCount       int
 }
 
 func (strategies *StrategiesConfig) AnyStrategyEnabled() bool {
@@ -125,16 +131,44 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	var strategies StrategiesConfig
 	strategiesExist := viper.InConfig("strategies")
 	if strategiesExist {
+		strategies.BinSizes = viper.GetStringSlice("strategies.bin_sizes")
 		strategies.RetryProcessCount = viper.GetInt("strategies.retry_process_count")
 		strategies.GetCandlesCount = viper.GetInt("strategies.get_candles_count")
 		strategies.BBLastCandlesCount = viper.GetInt("strategies.bb_last_candles_count")
 		strategies.EnableBolingerBand = viper.GetBool("strategies.enable_bb")
+		strategies.MacdFastCount = viper.GetInt("strategies.macd_fast_count")
+		strategies.MacdSlowCount = viper.GetInt("strategies.macd_slow_count")
+		strategies.MacdSigCount = viper.GetInt("strategies.macd_sig_count")
+		strategies.RsiCount = viper.GetInt("strategies.rsi_count")
+		for _, binSize := range strategies.BinSizes {
+			switch binSize {
+			case "5m", "15m", "1h", "1d":
+				break
+			default:
+				logrus.Fatalf("failed - unknown bin size: %s", binSize)
+			}
+		}
+		if strategies.MacdFastCount >= strategies.MacdSlowCount {
+			logrus.Fatal("macd fast should be less than macd slow")
+		}
+		if strategies.MacdSigCount > strategies.MacdFastCount ||
+			strategies.MacdSigCount > strategies.MacdSlowCount {
+			logrus.Fatal("macd sigshould be less than macd slow and macd fast")
+		}
+		if strategies.RsiCount >= strategies.MacdSlowCount {
+			logrus.Fatal("for initialization signals rsi_count must be less than macd_slow_count")
+		}
 	} else {
 		// default
+		strategies.BinSizes = []string{"5m"}
 		strategies.RetryProcessCount = 5
 		strategies.EnableBolingerBand = true
 		strategies.GetCandlesCount = 20
 		strategies.BBLastCandlesCount = 4
+		strategies.RsiCount = 14
+		strategies.MacdFastCount = 12
+		strategies.MacdSlowCount = 26
+		strategies.MacdSigCount = 9
 	}
 
 	cfg := &GlobalConfig{

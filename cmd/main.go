@@ -21,6 +21,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// TODO добавить инициализацию предыдущих сигналов если отсутствуют
+
 func main() {
 	var (
 		configPath       string
@@ -28,14 +30,15 @@ func main() {
 		migrationCommand string
 		testMode         bool
 		prof             string
-		tgEnable         bool
 		logDir           string
+		initSignals      bool
+		migrationOnly    bool
 	)
 
-	flag.BoolVar(&tgEnable, "telegram", false, "Enable telegram bot if installed this flag")
 	flag.StringVar(&prof, "prof", "", "file name for profiling")
 	flag.StringVar(&configPath, "config", "config-yaml/config-local.yaml", "configuration file")
 	flag.UintVar(&logLevel, "level", 4, "log level")
+	flag.BoolVar(&migrationOnly, "onlymigration", false, "run only migrations")
 	flag.StringVar(
 		&migrationCommand,
 		"migration",
@@ -43,6 +46,7 @@ func main() {
 		"database migration command:init, up, down, reset, version, set_version")
 	flag.BoolVar(&testMode, "test", false, "Use exchanges to test mode")
 	flag.StringVar(&logDir, "logdir", "", "logs save directory")
+	flag.BoolVar(&initSignals, "siginit", false, "initialization previous signals.By default disabled")
 	flag.Parse()
 
 	if prof != "" {
@@ -72,9 +76,18 @@ func main() {
 
 	log.Infof("configuration: %#v", cfg)
 
+	if migrationOnly {
+		log.Info("migrations started")
+	}
+
 	dbManager, err := db.New(cfg, nil, log, db.Command(migrationCommand))
 	if err != nil {
 		log.Fatalf("db.New() error: %v", err)
+	}
+
+	if migrationOnly {
+		log.Info("migrations completed")
+		return
 	}
 
 	tradeApi := tradeapi.NewTradeApi(
@@ -88,7 +101,7 @@ func main() {
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	wg := &sync.WaitGroup{}
-	strategiesType := strategies.New(wg, cfg, tradeApi, dbManager, log)
+	strategiesType := strategies.New(wg, cfg, tradeApi, dbManager, log, initSignals)
 	strategiesType.Start()
 	<-done
 

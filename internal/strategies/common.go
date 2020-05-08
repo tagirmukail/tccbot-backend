@@ -1,6 +1,7 @@
 package strategies
 
 import (
+	"errors"
 	"time"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
@@ -55,4 +56,13 @@ func (s *Strategies) retryProcess(
 		s.log.Errorf("retryProcess error: %v", err)
 	}
 	return err
+}
+
+func (s *Strategies) checkCloses(candles []bitmex.TradeBuck) error {
+	for _, candle := range candles {
+		if candle.Close == 0 {
+			return errors.New("candles not full, exist empty close values")
+		}
+	}
+	return nil
 }

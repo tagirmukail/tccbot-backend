@@ -13,14 +13,17 @@ func RegisterSignalTable(collections *migrations.Collection, log *logrus.Logger)
 				CREATE TABLE signals(
 					id         serial PRIMARY KEY,
 					bin        bin_size,
+					signal_t   signal_type,
 					n          int,
+					macd_fast  int,
+					macd_slow  int,
+					macd_sig   int,
 					timestamp  timestamp   NOT NULL,
-					sma        float4,
-					wma        float4,
-					ema        float4,
+					signal_v   float4,
 					bbtl 	   float4,
 					bbml	   float4,
 					bbbl 	   float4,
+					macd_h_v   float4,
 					created_at bigint NOT NULL,
     				updated_at bigint NOT NULL
 				)

@@ -70,7 +70,7 @@ func migration(cfg *config.GlobalConfig, log *logrus.Logger, command Command) er
 }
 
 func registerAllTables(collection *migrations.Collection, log *logrus.Logger, cfg *config.GlobalConfig) {
-	//dbmigrations.RegisterCandleTable(collection, log)
 	dbmigrations.RegisterBinSizeEnum(collection, log)
+	dbmigrations.RegisterSignalTypeEnum(collection, log)
 	dbmigrations.RegisterSignalTable(collection, log)
 }

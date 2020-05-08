@@ -21,12 +21,13 @@ import (
 )
 
 type Strategies struct {
-	wgRunner  *sync.WaitGroup
-	cfg       *config.GlobalConfig
-	tradeApi  *tradeapi.TradeApi
-	db        db.DBManager
-	log       *logrus.Logger
-	tradeCalc trademath.Calc
+	wgRunner    *sync.WaitGroup
+	cfg         *config.GlobalConfig
+	tradeApi    *tradeapi.TradeApi
+	db          db.DBManager
+	log         *logrus.Logger
+	tradeCalc   trademath.Calc
+	initSignals bool
 }
 
 func New(
@@ -35,17 +36,26 @@ func New(
 	tradeApi *tradeapi.TradeApi,
 	db db.DBManager,
 	log *logrus.Logger,
+	initSignals bool,
 ) *Strategies {
 	return &Strategies{
-		wgRunner: wgRunner,
-		cfg:      cfg,
-		tradeApi: tradeApi,
-		db:       db,
-		log:      log,
+		wgRunner:    wgRunner,
+		cfg:         cfg,
+		tradeApi:    tradeApi,
+		db:          db,
+		log:         log,
+		tradeCalc:   trademath.Calc{},
+		initSignals: initSignals,
 	}
 }
 
 func (s *Strategies) Start() {
+	if s.initSignals {
+		err := s.SignalsInit()
+		if err != nil {
+			s.log.Fatalf("SignalsInit failed: %v", err)
+		}
+	}
 	s.wgRunner.Add(1)
 	go s.start()
 	s.wgRunner.Wait()
@@ -55,12 +65,24 @@ func (s *Strategies) start() {
 	defer s.wgRunner.Done()
 
 	wg := &sync.WaitGroup{}
-	wg.Add(1)
-	go s.process5mCandles(wg)
-	//wg.Add(1)
-	//go s.process15Candles(wg)
-	//wg.Add(1)
-	//go s.process1hCandles(wg)
+	for _, binSize := range s.cfg.Strategies.BinSizes {
+		switch binSize {
+		case "5m":
+			wg.Add(1)
+			go s.process5mCandles(wg)
+		case "1h":
+			wg.Add(1)
+			go s.process1hCandles(wg)
+		case "15m":
+			wg.Add(1)
+			go s.process15Candles(wg)
+		case "1d":
+		// TODO add
+		default:
+			s.log.Fatalf("unknown bin_size: %s", binSize)
+		}
+
+	}
 	wg.Wait()
 }
 
@@ -141,9 +163,9 @@ func (s *Strategies) processTrade(binSize string, count int32) error {
 		signals *trademath.Singals
 		candles []bitmex.TradeBuck
 	)
-	bin := models.ToBinSize(binSize)
-	if bin == 0 {
-		return fmt.Errorf("bin size: %v unknown", binSize)
+	bin, err := models.ToBinSize(binSize)
+	if err != nil {
+		return err
 	}
 
 	for i := 0; i < 5; i++ {
@@ -163,9 +185,9 @@ func (s *Strategies) processTrade(binSize string, count int32) error {
 }
 
 func (s *Strategies) processCandles(binSize string, count int32) ([]bitmex.TradeBuck, *trademath.Singals, error) {
-	bin := models.ToBinSize(binSize)
-	if bin == 0 {
-		return nil, nil, fmt.Errorf("processCandles bin size: %v unknown", binSize)
+	bin, err := models.ToBinSize(binSize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("processCandles error: %v", err)
 	}
 	from, err := utils.FromTime(time.Now().UTC(), binSize, int(count))
 	if err != nil {
@@ -199,17 +221,7 @@ func (s *Strategies) processCandles(binSize string, count int32) ([]bitmex.Trade
 		return nil, nil, err
 	}
 	signals := s.tradeCalc.CalculateSignals(closes)
-	_, err = s.db.SaveSignal(models.Signal{
-		N:         int(count),
-		BinSize:   bin,
-		Timestamp: lastCandleTs,
-		SMA:       signals.SMA,
-		WMA:       signals.WMA,
-		EMA:       signals.EMA,
-		BBTL:      signals.BB.TL,
-		BBML:      signals.BB.ML,
-		BBBL:      signals.BB.BL,
-	})
+	err = s.saveSignals(lastCandleTs, bin, int(count), &signals)
 	if err != nil {
 		s.log.Debugf("processCandles db.SaveSignal error: %v", err)
 		return nil, nil, err
@@ -231,5 +243,55 @@ func (s *Strategies) processSignals(
 		}
 	}
 
+	return nil
+}
+
+func (s *Strategies) saveSignals(timestamp time.Time, bin models.BinSize, n int, signals *trademath.Singals) error {
+	_, err := s.db.SaveSignal(models.Signal{
+		N:          n,
+		BinSize:    bin,
+		Timestamp:  timestamp,
+		SignalType: models.BolingerBand,
+		BBTL:       signals.BB.TL,
+		BBML:       signals.BB.ML,
+		BBBL:       signals.BB.BL,
+	})
+	if err != nil {
+		s.log.Debugf("saveSignals db.SaveSignal bolinger band error: %v", err)
+		return err
+	}
+	_, err = s.db.SaveSignal(models.Signal{
+		N:           n,
+		BinSize:     bin,
+		Timestamp:   timestamp,
+		SignalType:  models.SMA,
+		SignalValue: signals.SMA,
+	})
+	if err != nil {
+		s.log.Debugf("saveSignals db.SaveSignal sma error: %v", err)
+		return err
+	}
+	_, err = s.db.SaveSignal(models.Signal{
+		N:           n,
+		BinSize:     bin,
+		Timestamp:   timestamp,
+		SignalType:  models.EMA,
+		SignalValue: signals.EMA,
+	})
+	if err != nil {
+		s.log.Debugf("saveSignals db.SaveSignal ema error: %v", err)
+		return err
+	}
+	_, err = s.db.SaveSignal(models.Signal{
+		N:           n,
+		BinSize:     bin,
+		Timestamp:   timestamp,
+		SignalType:  models.WMA,
+		SignalValue: signals.WMA,
+	})
+	if err != nil {
+		s.log.Debugf("saveSignals db.SaveSignal wma error: %v", err)
+		return err
+	}
 	return nil
 }

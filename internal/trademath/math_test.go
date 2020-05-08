@@ -124,3 +124,221 @@ func generateValues(n int, max, min float64) []float64 {
 	}
 	return result
 }
+
+func TestCalc_CalculateRSI(t *testing.T) {
+	assertr := assert.New(t)
+	type args struct {
+		values     []float64
+		indication MAIndication
+	}
+	tests := []struct {
+		name string
+		args args
+		want RSI
+	}{
+		{
+			name: "by sma",
+			args: args{
+				values: []float64{
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				indication: SMAIndication,
+			},
+			want: RSI{
+				Value: 0.552,
+			},
+		},
+		{
+			name: "by ema",
+			args: args{
+				values: []float64{
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				indication: EMAIndication,
+			},
+			want: RSI{
+				Value: 0.689,
+			},
+		},
+		{
+			name: "by wma",
+			args: args{
+				values: []float64{
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				indication: WMAIndication,
+			},
+			want: RSI{
+				Value: 0.641,
+			},
+		},
+		{
+			name: "unknown indication",
+			args: args{
+				values: []float64{
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				indication: 10,
+			},
+			want: RSI{
+				Value: 0,
+			},
+		},
+		{
+			name: "values less than 2",
+			args: args{
+				values: []float64{
+					1100,
+				},
+				indication: SMAIndication,
+			},
+			want: RSI{
+				Value: 0,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Calc{}
+			got := c.CalculateRSI(tt.args.values, tt.args.indication)
+			assertr.Equal(tt.want, got, "rsi calculation")
+		})
+	}
+}
+
+func TestCalc_CalculateMACD(t *testing.T) {
+	assertr := assert.New(t)
+	type args struct {
+		fastValues     []float64
+		slowValues     []float64
+		prevMACDValues []float64
+		indication     MAIndication
+	}
+	tests := []struct {
+		name string
+		args args
+		want MACD
+	}{
+		{
+			name: "ok",
+			args: args{
+				fastValues: []float64{
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				slowValues: []float64{
+					1138,
+					1134,
+					1128,
+					1124,
+					1111,
+					1003,
+					1110,
+					1111,
+					1127,
+					1128,
+					1125,
+					1120,
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+				},
+				prevMACDValues: []float64{
+					3.20,
+					-2.11,
+					3.01,
+					1.15,
+					-4,
+					-1,
+					1.2,
+					2.3,
+				},
+				indication: EMAIndication,
+			},
+			want: MACD{
+				HistogramValue: 3.857,
+				Sig:            0.8452,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Calc{}
+			got := c.CalculateMACD(tt.args.fastValues, tt.args.slowValues, tt.args.prevMACDValues, tt.args.indication)
+			assertr.Equal(tt.want, got, "MACD calculation")
+		})
+	}
+}

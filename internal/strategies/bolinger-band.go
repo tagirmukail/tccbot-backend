@@ -22,7 +22,7 @@ func (s *Strategies) processBB(
 		return err
 	}
 
-	lastSignals, err := s.db.GetLastSignalsByTs(binSize, lastCandlesTs)
+	lastSignals, err := s.db.GetSignalsByTs(binSize, lastCandlesTs)
 	if err != nil {
 		return err
 	}

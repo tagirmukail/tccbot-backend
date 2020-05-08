@@ -2,50 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"math"
 	"time"
 )
-
-const SatoshisPerBTC = 100000000
-
-func RemoveEmptyValues(indexes []float64, vals []float64) ([]float64, []float64) {
-	var indxesResult = make([]float64, 0)
-	var result = make([]float64, 0)
-	for i, indx := range indexes {
-		if vals[i] == 0 {
-			continue
-		}
-		indxesResult = append(indxesResult, indx)
-		result = append(result, vals[i])
-	}
-
-	return indxesResult, result
-}
-
-// RoundFloat rounds your floating point number to the desired decimal place
-func RoundFloat(x float64, prec int) float64 {
-	var rounder float64
-	pow := math.Pow(10, float64(prec))
-	intermed := x * pow
-	_, frac := math.Modf(intermed)
-	intermed += .5
-	x = .5
-	if frac < 0.0 {
-		x = -.5
-		intermed--
-	}
-	if frac >= x {
-		rounder = math.Ceil(intermed)
-	} else {
-		rounder = math.Floor(intermed)
-	}
-
-	return rounder / pow
-}
-
-func ConvertToBTC(balance int64) float64 {
-	return float64(balance) / SatoshisPerBTC
-}
 
 func FromTime(now time.Time, binSize string, count int) (from time.Time, err error) {
 	var (

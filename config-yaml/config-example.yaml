@@ -34,6 +34,11 @@ exchanges_access:
 
 strategies:
   enable_bb: true # bolinger band
+  bin_sizes: ["5m","1h"]
   retry_process_count: 5
   bb_last_candles_count: 4
   get_candles_count: 30
+  rsi_count: 14
+  macd_fast_count: 12
+  macd_slow_count: 26
+  macd_sig_count: 9

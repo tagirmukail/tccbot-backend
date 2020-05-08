@@ -35,25 +35,26 @@ func (b *BinSize) Scan(value interface{}) error {
 	if !ok {
 		return fmt.Errorf("value type must be only string, but current:%T", value)
 	}
-	*b = ToBinSize(bin)
-	return nil
+	var err error
+	*b, err = ToBinSize(bin)
+	return err
 }
 
-func (b BinSize) Value() (driver.Value, error) {
+func (b *BinSize) Value() (driver.Value, error) {
 	return b.String(), nil
 }
 
-func ToBinSize(binSize string) BinSize {
+func ToBinSize(binSize string) (BinSize, error) {
 	switch binSize {
 	case "1m":
-		return Bin1m
+		return Bin1m, nil
 	case "5m":
-		return Bin5m
+		return Bin5m, nil
 	case "1h":
-		return Bin1h
+		return Bin1h, nil
 	case "1d":
-		return Bin1d
+		return Bin1d, nil
 	default:
-		return 0
+		return 0, fmt.Errorf("unknown bin_size:%s", binSize)
 	}
 }
