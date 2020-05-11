@@ -7,6 +7,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
@@ -18,17 +20,23 @@ import (
 type Strategies struct {
 	wgRunner    *sync.WaitGroup
 	cfg         *config.GlobalConfig
-	tradeApi    *tradeapi.TradeApi
+	tradeApi    tradeapi.Api
 	db          db.DBManager
 	log         *logrus.Logger
 	tradeCalc   trademath.Calc
+	orderProc   *orderproc.OrderProcessor
 	initSignals bool
+	rsiPrev     struct {
+		minBorderInProc bool
+		maxBorderInProc bool
+	}
 }
 
 func New(
 	wgRunner *sync.WaitGroup,
 	cfg *config.GlobalConfig,
-	tradeApi *tradeapi.TradeApi,
+	tradeApi tradeapi.Api,
+	orderProc *orderproc.OrderProcessor,
 	db db.DBManager,
 	log *logrus.Logger,
 	initSignals bool,
@@ -37,6 +45,7 @@ func New(
 		wgRunner:    wgRunner,
 		cfg:         cfg,
 		tradeApi:    tradeApi,
+		orderProc:   orderProc,
 		db:          db,
 		log:         log,
 		tradeCalc:   trademath.Calc{},
@@ -87,6 +96,18 @@ func (s *Strategies) process5mCandles(wg *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
+	t := time.Now().UTC()
+	remainder := t.Minute() % 5
+
+	if remainder > 0 {
+		s.log.Infof("process 5m candles wait %d min", 5-remainder)
+		<-time.After(time.Duration(5-remainder)*time.Minute + time.Second)
+		s.log.Infof("process 5m candles wait %d min exceeded", 5-remainder)
+	} else {
+		time.Sleep(1 * time.Second)
+	}
+	s.processStrategies("5m", int32(s.cfg.Strategies.GetCandlesCount))
+
 	// for debug used 1m
 	tick := time.NewTicker(5 * time.Minute)
 	defer tick.Stop()
@@ -127,6 +148,18 @@ func (s *Strategies) process1hCandles(wg *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
+	t := time.Now().UTC()
+	remainder := t.Minute() % 60
+
+	if remainder > 0 {
+		s.log.Infof("process 1h candles wait %d min", 60-remainder)
+		<-time.After(time.Duration(60-remainder)*time.Minute + time.Second)
+		s.log.Infof("process 1h candles wait %d min exceeded", 60-remainder)
+	} else {
+		time.Sleep(1 * time.Second)
+	}
+	s.processStrategies("1h", int32(s.cfg.Strategies.GetCandlesCount))
+
 	tick := time.NewTicker(1 * time.Hour)
 	defer tick.Stop()
 	for {
@@ -151,6 +184,12 @@ func (s *Strategies) processStrategies(binSize string, count int32) {
 		err := s.processMACDStrategy(binSize)
 		if err != nil {
 			s.log.Errorf("processMACDStrategy error: %v", err)
+		}
+	}
+	if s.cfg.Strategies.EnableRSI {
+		err := s.processRsiStrategy(binSize)
+		if err != nil {
+			s.log.Errorf("processRsiStrategy error: %v", err)
 		}
 	}
 }

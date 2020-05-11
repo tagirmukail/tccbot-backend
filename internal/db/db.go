@@ -7,8 +7,10 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/sirupsen/logrus"
+
 	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
 type DBManager interface {
@@ -27,6 +29,7 @@ type DBManager interface {
 	// CandlesWithSignals
 	//GetCandleWithSignals(id int64) (*models.CandleWithSignals, error)
 	//GetLastCandlesWithSignals(theme types.Theme, n int, limit int) ([]*models.CandleWithSignals, error)
+	SaveOrder(ord bitmex.OrderCopied) (*models.Order, error)
 }
 
 type DB struct {

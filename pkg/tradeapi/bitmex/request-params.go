@@ -13,11 +13,13 @@ type OrderNewParams struct {
 	ClientOrderID string `json:"clOrdID,omitempty"`
 
 	// ClientOrderLinkID - [Optional] Client Order Link ID for contingent orders.
+	// Deprecated
 	ClientOrderLinkID string `json:"clOrdLinkID,omitempty"`
 
 	// ContingencyType - [Optional] contingency type for use with `clOrdLinkID`.
 	// Valid options: OneCancelsTheOther, OneTriggersTheOther,
 	// OneUpdatesTheOtherAbsolute, OneUpdatesTheOtherProportional.
+	// Deprecated
 	ContingencyType string `json:"contingencyType,omitempty"`
 
 	// DisplayQuantity- [Optional] quantity to display in the book. Use 0 for a fully
@@ -38,8 +40,8 @@ type OrderNewParams struct {
 	// are specified.
 	OrderType string `json:"ordType,omitempty"`
 
-	// OrderQuantity Order quantity in units of the instrument (i.e. contracts).
-	OrderQuantity float64 `json:"orderQty,omitempty"`
+	// OrderQty Order quantity in units of the instrument (i.e. contracts).
+	OrderQty float64 `json:"orderQty,omitempty"`
 
 	// PegOffsetValue - [Optional] trailing offset from the current price for
 	// 'Stop', 'StopLimit', 'MarketIfTouched', and 'LimitIfTouched' orders; use a
@@ -106,7 +108,7 @@ type OrderAmendParams struct {
 
 	OrderID string `json:"orderID,omitempty"`
 
-	// OrderQuantity - [Optional] order quantity in units of the instrument
+	// OrderQty - [Optional] order quantity in units of the instrument
 	// (i.e. contracts).
 	OrderQty int32 `json:"orderQty,omitempty"`
 
@@ -249,4 +251,76 @@ func (t *TradeGetBucketedParams) toUrlVals() (*url.Values, error) {
 	}
 
 	return vals, nil
+}
+
+// PositionUpdateLeverageParams contains all the parameters to send to the API
+// endpoint
+type PositionUpdateLeverageParams struct {
+	// Leverage - Leverage value. Send a number between 0.01 and 100 to enable
+	// isolated margin with a fixed leverage. Send 0 to enable cross margin.
+	Leverage float64 `json:"leverage,omitempty"`
+
+	// Symbol - Symbol of position to adjust.
+	Symbol string `json:"symbol,omitempty"`
+}
+
+// PositionGetParams contains all the parameters to send to the API endpoint
+type PositionGetParams struct {
+
+	// Columns - Which columns to fetch. For example, send ["columnName"].
+	Columns string `json:"columns,omitempty"`
+
+	// Count - Number of rows to fetch.
+	Count int32 `json:"count,omitempty"`
+
+	// Filter - Table filter. For example, send {"symbol": "XBTUSD"}.
+	Filter string `json:"filter,omitempty"`
+}
+
+// InstrumentRequestParams contains all the parameters for some general functions
+type InstrumentRequestParams struct {
+	// Columns - [Optional] Array of column names to fetch. If omitted, will
+	// return all columns.
+	// NOTE that this method will always return item keys, even when not
+	// specified, so you may receive more columns that you expect.
+	Columns string `json:"columns,omitempty"`
+
+	// Count - Number of results to fetch.
+	Count int32 `json:"count,omitempty"`
+
+	// EndTime - Ending date filter for results.
+	EndTime string `json:"endTime,omitempty"`
+
+	// Filter - Generic table filter. Send JSON key/value pairs, such as
+	// `{"key": "value"}`. You can key on individual fields, and do more advanced
+	// querying on timestamps. See the
+	// [Timestamp Docs](https://testnet.bitmex.com/app/restAPI#Timestamp-Filters)
+	// for more details.
+	Filter string `json:"filter,omitempty"`
+
+	// Reverse - If true, will sort results newest first.
+	Reverse bool `json:"reverse,omitempty"`
+
+	// Start - Starting point for results.
+	Start int32 `json:"start,omitempty"`
+
+	// StartTime - Starting date filter for results.
+	StartTime string `json:"startTime,omitempty"`
+
+	// Symbol - Instrument symbol. Send a bare series (e.g. XBU) to get data for
+	// the nearest expiring contract in that series.
+	// You can also send a timeframe, e.g. `XBU:monthly`. Timeframes are `daily`,
+	// `weekly`, `monthly`, `quarterly`, and `biquarterly`.
+	Symbol string `json:"symbol,omitempty"`
+}
+
+func (i *InstrumentRequestParams) toUrlVars() url.Values {
+	vals := url.Values{}
+	vals.Add("columns", i.Columns)
+	vals.Add("count", strconv.Itoa(int(i.Count)))
+	vals.Add("reverse", strconv.FormatBool(i.Reverse))
+	vals.Add("filter", i.Filter)
+	vals.Add("start", strconv.Itoa(int(i.Start)))
+	vals.Add("symbol", i.Symbol)
+	return vals
 }

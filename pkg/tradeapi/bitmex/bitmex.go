@@ -154,6 +154,9 @@ func (b *Bitmex) SendAuthenticatedRequest(
 			return err
 		}
 		data = string(bData)
+		if b.verbose {
+			b.logger.Infof("request params: %s", data)
+		}
 	}
 	hmac := crypto.GetHashMessage(crypto.HashSHA256,
 		[]byte(verb+"/api/v1"+path+timestampNew+data),

@@ -24,7 +24,7 @@ func TestStrategies_findTwoMax(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "not divergence",
+			name: "not bearDiverg",
 			args: args{
 				tframe: 3,
 				signals: []*models.Signal{
@@ -59,7 +59,7 @@ func TestStrategies_findTwoMax(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "max for divergence",
+			name: "max for bearDiverg",
 			args: args{
 				tframe: 3,
 				signals: []*models.Signal{
@@ -94,7 +94,7 @@ func TestStrategies_findTwoMax(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "max for divergence, first max is equal second max",
+			name: "max for bearDiverg, first max is equal second max",
 			args: args{
 				tframe: 3,
 				signals: []*models.Signal{
@@ -205,7 +205,7 @@ func TestStrategies_findTwoMin(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "find two min, convergence - ok",
+			name: "find two min, bullDiverg - ok",
 			args: args{
 				tframe: 3,
 				signals: []*models.Signal{
@@ -249,7 +249,7 @@ func TestStrategies_findTwoMin(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "find two min, convergence invalid",
+			name: "find two min, bullDiverg invalid",
 			args: args{
 				tframe: 3,
 				signals: []*models.Signal{

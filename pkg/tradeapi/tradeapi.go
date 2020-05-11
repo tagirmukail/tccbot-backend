@@ -1,6 +1,7 @@
 package tradeapi
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -14,8 +15,33 @@ const (
 	TradeBucketedTimestampLayout = "2006-01-02T15:04:05.000Z"
 )
 
+type Api interface {
+	GetBitmex() ExchangeApi
+}
+
+type ExchangeApi interface {
+	EnableTestNet()
+
+	// Bitmex
+	SetDefaultUserAgent(agent string)
+	SendRequest(path string, params url.Values, response interface{}) error
+	SendAuthenticatedRequest(verb, path string, params, response interface{}) error
+	GetUserMargin(currency string) (bitmex.UserMargin, error)
+	GetAllUserMargin() ([]bitmex.UserMargin, error)
+	GetUserWalletInfo(currency string) (bitmex.WalletInfo, error)
+	GetOrders(params *bitmex.OrdersRequest) ([]bitmex.Order, error)
+	CreateOrder(params *bitmex.OrderNewParams) (bitmex.OrderCopied, error)
+	AmendOrder(params *bitmex.OrderAmendParams) (bitmex.Order, error)
+	CancelOrders(params *bitmex.OrderCancelParams) ([]bitmex.Order, error)
+	CancelAllOrders(params *bitmex.OrderCancelAllParams) ([]bitmex.Order, error)
+	GetTradeBucketed(params *bitmex.TradeGetBucketedParams) ([]bitmex.TradeBuck, error)
+	LeveragePosition(params *bitmex.PositionUpdateLeverageParams) (bitmex.Position, error)
+	GetPositions(params bitmex.PositionGetParams) ([]bitmex.Position, error)
+	GetInstrument(params bitmex.InstrumentRequestParams) ([]bitmex.Instrument, error)
+}
+
 type TradeApi struct {
-	bitmex *bitmex.Bitmex
+	bitmex ExchangeApi
 }
 
 func NewTradeApi(
@@ -43,6 +69,6 @@ func NewTradeApi(
 	return tapi
 }
 
-func (t *TradeApi) GetBitmex() *bitmex.Bitmex {
+func (t *TradeApi) GetBitmex() ExchangeApi {
 	return t.bitmex
 }

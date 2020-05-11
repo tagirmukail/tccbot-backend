@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"github.com/tagirmukail/tccbot-backend/internal/types"
 )
 
 type GlobalConfig struct {
@@ -25,11 +26,14 @@ type DB struct {
 type StrategiesConfig struct {
 	EnableBolingerBand bool
 	EnableMACD         bool
+	EnableRSI          bool
 	BinSizes           []string
 	RetryProcessCount  int
 	GetCandlesCount    int
 	BBLastCandlesCount int
 	RsiCount           int
+	RsiMinBorder       uint32
+	RsiMaxBorder       uint32
 	MacdFastCount      int
 	MacdSlowCount      int
 	MacdSigCount       int
@@ -55,6 +59,9 @@ type ApiSettings struct {
 	RetrySec   int
 	BufferSize int
 	Currency   string
+	Symbol     string
+	OrderType  types.OrderType
+	MaxAmount  float64
 }
 
 type BitmexCfg struct {
@@ -107,8 +114,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	}
 
 	var bitmex ApiSettings
-	bitmexExist := viper.InConfig("exchanges_settings.bitmex")
-	if !bitmexExist {
+	bitmexSettings := viper.GetStringMap("exchanges_settings.bitmex")
+	if len(bitmexSettings) == 0 {
 		// default
 		bitmex = ApiSettings{
 			Test:       true,
@@ -116,7 +123,10 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			TimeoutSec: 30,
 			RetrySec:   5,
 			BufferSize: 10,
-			Currency:   "XBTUSD",
+			Currency:   "XBt",
+			Symbol:     "XBTUSD",
+			OrderType:  types.Limit,
+			MaxAmount:  10,
 		}
 	} else {
 		bitmex = ApiSettings{
@@ -125,7 +135,10 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			TimeoutSec: viper.GetInt("exchanges_settings.bitmex.timeout_sec"),
 			RetrySec:   viper.GetInt("exchanges_settings.bitmex.retry_sec"),
 			BufferSize: viper.GetInt("exchanges_settings.bitmex.buffer_size"),
+			Symbol:     viper.GetString("exchanges_settings.bitmex.symbol"),
 			Currency:   viper.GetString("exchanges_settings.bitmex.currency"),
+			OrderType:  types.OrderType(viper.GetString("exchanges_settings.bitmex.order_type")),
+			MaxAmount:  viper.GetFloat64("exchanges_settings.bitmex.max_amount"),
 		}
 	}
 
@@ -134,6 +147,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	if strategiesExist {
 		strategies.EnableBolingerBand = viper.GetBool("strategies.enable_bb")
 		strategies.EnableMACD = viper.GetBool("strategies.enable_macd")
+		strategies.EnableRSI = viper.GetBool("strategies.enable_rsi")
 		strategies.BinSizes = viper.GetStringSlice("strategies.bin_sizes")
 		strategies.RetryProcessCount = viper.GetInt("strategies.retry_process_count")
 		strategies.GetCandlesCount = viper.GetInt("strategies.get_candles_count")
@@ -142,6 +156,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		strategies.MacdSlowCount = viper.GetInt("strategies.macd_slow_count")
 		strategies.MacdSigCount = viper.GetInt("strategies.macd_sig_count")
 		strategies.RsiCount = viper.GetInt("strategies.rsi_count")
+		strategies.RsiMinBorder = viper.GetUint32("strategies.rsi_min_border")
+		strategies.RsiMaxBorder = viper.GetUint32("strategies.rsi_max_border")
 		for _, binSize := range strategies.BinSizes {
 			switch binSize {
 			case "5m", "15m", "1h", "1d":
@@ -168,12 +184,14 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		strategies.GetCandlesCount = 20
 		strategies.BBLastCandlesCount = 4
 		strategies.RsiCount = 14
+		strategies.RsiMinBorder = 30
+		strategies.RsiMaxBorder = 70
 		strategies.MacdFastCount = 12
 		strategies.MacdSlowCount = 26
 		strategies.MacdSigCount = 9
 	}
 
-	if !strategies.EnableBolingerBand && !strategies.EnableMACD {
+	if !strategies.EnableBolingerBand && !strategies.EnableMACD && !strategies.EnableRSI {
 		logrus.Fatal("all strategies disabled, enable any strategy")
 	}
 

@@ -1,9 +1,13 @@
 package utils
 
 import (
+	"math"
+	"math/rand"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFromTime(t *testing.T) {
@@ -79,6 +83,35 @@ func TestFromTime(t *testing.T) {
 			if !reflect.DeepEqual(gotFrom, tt.wantFrom) {
 				t.Errorf("FromTime() gotFrom = %v, want %v", gotFrom, tt.wantFrom)
 			}
+		})
+	}
+}
+
+func TestRandomRange(t *testing.T) {
+	type args struct {
+		min float64
+		max float64
+	}
+	tests := []struct {
+		name string
+		args args
+		want float64
+	}{
+		{
+			name: "ok",
+			args: args{
+				min: 2.5,
+				max: 0,
+			},
+			want: 0,
+		},
+	}
+	rand.Seed(time.Now().UnixNano())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := RandomRange(tt.args.min, tt.args.max)
+			assert.NotEmpty(t, got)
+			t.Logf("random value: %v", math.Round(got))
 		})
 	}
 }

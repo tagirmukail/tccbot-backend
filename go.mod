@@ -11,4 +11,5 @@ require (
 	github.com/sirupsen/logrus v1.6.0
 	github.com/spf13/viper v1.6.3
 	github.com/stretchr/testify v1.5.1
+	github.com/thrasher-corp/gocryptotrader v0.0.0-20200510033826-d08f9afb1465 // indirect
 )

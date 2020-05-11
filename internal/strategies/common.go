@@ -4,6 +4,9 @@ import (
 	"errors"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/internal/types"
+	"github.com/tagirmukail/tccbot-backend/internal/utils"
+
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
@@ -89,4 +92,26 @@ func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int {
 	default:
 		return 0
 	}
+}
+
+func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalType) error {
+	balance, err := s.orderProc.GetBalance()
+	if err != nil {
+		s.log.Warnf("orderProc.GetBalance failed: %v", err)
+		return err
+	}
+	// fixme - return amount=0
+	amount := utils.RandomRange(2.5, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
+	if amount > balance {
+		amount = balance / 2
+	}
+
+	ord, err := s.orderProc.PlaceOrder(types.Bitmex, signalType, side, amount, 0, false)
+	if err != nil {
+		s.log.Warnf("orderProc.PlaceOrder failed: %v", err)
+		return err
+	}
+
+	s.log.Infof("sell order placed: %#v", ord)
+	return nil
 }

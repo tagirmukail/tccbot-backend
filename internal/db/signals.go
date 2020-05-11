@@ -13,12 +13,26 @@ import (
 
 func (db *DB) SaveSignal(data models.Signal) (int64, error) {
 	var (
-		createdAt = time.Now().Unix()
-		lastID    int64
+		createdAt    = time.Now().Unix()
+		lastID       int64
+		existSignals []*models.Signal
 	)
+	err := db.db.Select(&existSignals,
+		`SELECT id FROM signals WHERE signal_t=$1 AND bin=$2 AND timestamp=$3`,
+		data.SignalType.String(),
+		data.BinSize.String(),
+		data.Timestamp,
+	)
+	if err != nil {
+		return 0, err
+	}
+	if len(existSignals) != 0 { // signal already exist, is not error - is feature )))
+		return existSignals[0].ID, nil
+	}
+
 	data.CreatedAt = createdAt
 	data.UpdatedAt = createdAt
-	err := db.db.QueryRow(`INSERT INTO signals(
+	err = db.db.QueryRow(`INSERT INTO signals(
                     n,
                     macd_fast,
                     macd_slow,
@@ -96,7 +110,6 @@ func (db *DB) GetSignalsByTs(
 		}
 	}
 
-	// fixme: error - Cannot encode int64 into oid 16472 - int64 must implement Encoder or be converted to a string
 	query, args, err := sqlx.In(
 		fmt.Sprintf(
 			`SELECT * FROM signals WHERE signal_t IN (%s) AND bin IN (%s) AND timestamp IN (?)`,

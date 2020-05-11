@@ -1,5 +1,12 @@
 package types
 
+type Exchange string
+
+const (
+	Bitmex  Exchange = "bitmex"
+	Binance Exchange = "binance"
+)
+
 type Symbol string
 
 const (
@@ -11,6 +18,24 @@ type Side string
 const (
 	SideSell = "Sell"
 	SideBuy  = "Buy"
+)
+
+type OrderType string
+
+const (
+	Limit           OrderType = "Limit"
+	Market          OrderType = "Market"
+	StopLimit       OrderType = "StopLimit"
+	LimitIfTouched  OrderType = "LimitIfTouched"
+	MarketIfTouched OrderType = "MarketIfTouched"
+)
+
+type OrdStatus string
+
+const (
+	OrdNew      OrdStatus = "New"
+	OrdFilled   OrdStatus = "Filled"
+	ordCanceled OrdStatus = "Canceled"
 )
 
 type Theme string

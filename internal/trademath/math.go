@@ -95,14 +95,22 @@ func (c *Calc) CalculateRSI(values []float64, indication MAIndication) RSI {
 		}
 		change := value - values[i-1]
 		if change > 0 {
-			gainValues = append(gainValues, value)
-		} else {
-			lossValues = append(lossValues, value)
+			gainValues = append(gainValues, change)
+		} else if change < 0 {
+			lossValues = append(lossValues, math.Abs(change))
 		}
 	}
 
-	rs := maCalcFunc(gainValues) / maCalcFunc(lossValues)
-	rsi.Value = RoundFloat(100-(100/rs), 3)
+	gain := maCalcFunc(gainValues)
+	loss := maCalcFunc(lossValues)
+	var rs float64
+	if loss != 0 {
+		rs = gain / loss
+	} else {
+		rs = 100
+	}
+	rsiVal := 100 - (100 / (1 + rs))
+	rsi.Value = RoundFloat(rsiVal, 3)
 	return rsi
 }
 

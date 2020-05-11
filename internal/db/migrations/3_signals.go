@@ -28,6 +28,18 @@ func RegisterSignalTable(collections *migrations.Collection, log *logrus.Logger)
     				updated_at bigint NOT NULL
 				)
 			`)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			_, err = db.ExecOne(
+				`CREATE UNIQUE INDEX ts_bin_signal_t_idx ON signals (timestamp, bin, signal_t)`,
+			)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+
 			return err
 		},
 		func(db migrations.DB) error {

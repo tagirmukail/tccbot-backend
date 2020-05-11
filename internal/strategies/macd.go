@@ -11,6 +11,7 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
+// fixme - расчет не совпадает с показателями биржи, необходимо пересчитать
 func (s *Strategies) processMACDStrategy(binSize string) error {
 	bin, err := models.ToBinSize(binSize)
 	if err != nil {
@@ -23,7 +24,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 	}
 
 	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
-		Symbol:    s.cfg.ExchangesSettings.Bitmex.Currency,
+		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     int32(s.cfg.Strategies.MacdSlowCount),
 		StartTime: fromTime.Format(bitmex.TradeTimeFormat),
@@ -78,8 +79,20 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 		return err
 	}
 
-	// todo send order
 	s.log.Infof("processMACDSignals defined -->: %#v", macdDiverg)
+	//if macdDiverg.bearDiverg {
+	//	err := s.placeBitmexOrder(types.SideSell)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+	//if macdDiverg.bullDiverg {
+	//	err := s.placeBitmexOrder(types.SideBuy)
+	//	if err != nil {
+	//		return err
+	//	}
+	//}
+
 	return nil
 }
 
@@ -87,8 +100,8 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 func (s *Strategies) processMACDSignals(
 	binSize models.BinSize, timestamps []time.Time, candles []bitmex.TradeBuck,
 ) (result struct {
-	divergence  bool
-	convergence bool
+	bearDiverg bool
+	bullDiverg bool
 }, err error) {
 	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.MACD}, []models.BinSize{binSize}, timestamps)
 	if err != nil {
@@ -107,20 +120,18 @@ func (s *Strategies) processMACDSignals(
 
 	lastSignal := signals[len(signals)-1]
 	if lastSignal.MACDHistogramValue > 0 {
-		divergenceIsDefined, err := s.defineDivergence(binSize, filteredCandles, signals)
+		bearDivergIsDefined, err := s.defineBearDivergence(binSize, filteredCandles, signals)
 		if err != nil {
 			return result, err
 		}
-		result.divergence = divergenceIsDefined
-		s.log.Debug(divergenceIsDefined)
+		result.bearDiverg = bearDivergIsDefined
 	}
 	if lastSignal.MACDHistogramValue < 0 {
-		convergenceIsDefined, err := s.defineConvergence(binSize, filteredCandles, signals)
+		bullDivergenceIsDefined, err := s.defineBullDivergence(binSize, filteredCandles, signals)
 		if err != nil {
 			return result, err
 		}
-		result.convergence = convergenceIsDefined
-		s.log.Debug(convergenceIsDefined)
+		result.bullDiverg = bullDivergenceIsDefined
 	}
 
 	return result, nil
@@ -139,7 +150,7 @@ func (s *Strategies) validateDefineMechanism(
 	return nil
 }
 
-func (s *Strategies) defineConvergence(
+func (s *Strategies) defineBullDivergence(
 	binSize models.BinSize, fCandles []*bitmex.TradeBuck, signals []*models.Signal,
 ) (bool, error) {
 	err := s.validateDefineMechanism(fCandles, signals)
@@ -154,9 +165,26 @@ func (s *Strategies) defineConvergence(
 	if err != nil {
 		return false, err
 	}
-	s.log.Debug(minHistVals)
+	if minHistVals.secondMin <= minHistVals.firstMin {
+		s.log.Debugf("bullDivergence not confirmed by signals")
+		return false, nil
+	}
+	if fCandles[minHistVals.secondMinIndx].Close > fCandles[minHistVals.firstMinIndx].Close {
+		s.log.Debug("bull divergence not confirmed by candles")
+		s.log.Debugf("first min histogram val:%v", minHistVals.firstMin)
+		s.log.Debugf("first close val:%v", fCandles[minHistVals.firstMinIndx].Close)
+		s.log.Debugf("second min histogram val:%v", minHistVals.secondMin)
+		s.log.Debugf("second close val:%v", fCandles[minHistVals.secondMinIndx].Close)
+		return false, nil
+	}
 
-	return false, nil
+	s.log.Debug("bull divergence confirmed")
+	s.log.Debugf("first min histogram val:%v", minHistVals.firstMin)
+	s.log.Debugf("first close val:%v", fCandles[minHistVals.firstMinIndx].Close)
+	s.log.Debugf("second min histogram val:%v", minHistVals.secondMin)
+	s.log.Debugf("second close val:%v", fCandles[minHistVals.secondMinIndx].Close)
+
+	return true, nil
 }
 
 func (s *Strategies) findTwoMin(tframe int, signals []*models.Signal) (result struct {
@@ -214,7 +242,7 @@ func (s *Strategies) findTwoMin(tframe int, signals []*models.Signal) (result st
 	return result, err
 }
 
-func (s *Strategies) defineDivergence(
+func (s *Strategies) defineBearDivergence(
 	binSize models.BinSize, fCandles []*bitmex.TradeBuck, signals []*models.Signal,
 ) (bool, error) {
 	err := s.validateDefineMechanism(fCandles, signals)
@@ -225,23 +253,33 @@ func (s *Strategies) defineDivergence(
 	if timeFrame == 0 || len(signals) < timeFrame {
 		return false, errors.New("time frame is 0 or count signals less than time frame")
 	}
-	// check histogram divergence
+	// check histogram bearDiverg
 	maxHistVals, err := s.findTwoMax(timeFrame, signals)
 	if err != nil {
 		return false, err
 	}
 	s.log.Debugf("findTwoMax max hist vals: %#v", maxHistVals)
 	if maxHistVals.secondMax >= maxHistVals.firstMax {
-		// exit - divergence not confirmed
-		s.log.Debugf("divergence not confirmed by signals")
+		// exit - bearDiverg not confirmed
+		s.log.Debugf("bearDivergence not confirmed by signals")
 		return false, nil
 	}
 	// check price reversal
 	if fCandles[maxHistVals.secondMaxIndx].Close < fCandles[maxHistVals.firstMaxIndx].Close {
-		// exit - divergence not confirmed
-		s.log.Debugf("divergence not confirmed by candles")
+		// exit - bearDiverg not confirmed
+		s.log.Debugf("bearDivergence not confirmed by candles")
+		s.log.Debugf("first max histogram val:%v", maxHistVals.firstMax)
+		s.log.Debugf("first close val:%v", fCandles[maxHistVals.firstMaxIndx].Close)
+		s.log.Debugf("second max histogram val:%v", maxHistVals.secondMax)
+		s.log.Debugf("second close val:%v", fCandles[maxHistVals.secondMaxIndx].Close)
 		return false, nil
 	}
+
+	s.log.Debugf("bearDivergence is confirmed")
+	s.log.Debugf("first max histogram val:%v", maxHistVals.firstMax)
+	s.log.Debugf("first close val:%v", fCandles[maxHistVals.firstMaxIndx].Close)
+	s.log.Debugf("second max histogram val:%v", maxHistVals.secondMax)
+	s.log.Debugf("second close val:%v", fCandles[maxHistVals.secondMaxIndx].Close)
 
 	return true, nil
 }

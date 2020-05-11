@@ -101,3 +101,34 @@ func (b *Bitmex) GetTradeBucketed(params *TradeGetBucketedParams) ([]TradeBuck, 
 		&resp,
 	)
 }
+
+func (b *Bitmex) LeveragePosition(params *PositionUpdateLeverageParams) (Position, error) {
+	var resp Position
+	return resp, b.SendAuthenticatedRequest(
+		http.MethodPost,
+		endpointLeveragePosition,
+		params,
+		&resp,
+	)
+}
+
+// GetPositions returns positions
+func (b *Bitmex) GetPositions(params PositionGetParams) ([]Position, error) {
+	var positions []Position
+
+	return positions, b.SendAuthenticatedRequest(
+		http.MethodGet,
+		endpointPosition,
+		params,
+		&positions,
+	)
+}
+
+func (b *Bitmex) GetInstrument(params InstrumentRequestParams) ([]Instrument, error) {
+	var resp []Instrument
+	return resp, b.SendRequest(
+		endpointInstrument,
+		params.toUrlVars(),
+		&resp,
+	)
+}

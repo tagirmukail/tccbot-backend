@@ -158,7 +158,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 				indication: SMAIndication,
 			},
 			want: RSI{
-				Value: 0.552,
+				Value: 59.503,
 			},
 		},
 		{
@@ -183,7 +183,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 				indication: EMAIndication,
 			},
 			want: RSI{
-				Value: 0.689,
+				Value: 49.771,
 			},
 		},
 		{
@@ -208,7 +208,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 				indication: WMAIndication,
 			},
 			want: RSI{
-				Value: 0.641,
+				Value: 52.861,
 			},
 		},
 		{

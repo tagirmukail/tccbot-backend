@@ -27,4 +27,9 @@ const (
 	endpointOrder         = "/order"
 	endpointAllOrders     = "/order/all"
 	endpointTradeBucketed = "/trade/bucketed"
+
+	endpointLeveragePosition = "/position/leverage"
+	endpointPosition         = "/position"
+
+	endpointInstrument = "/instrument"
 )

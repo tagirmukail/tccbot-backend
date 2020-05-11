@@ -8,6 +8,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+
 	"github.com/tagirmukail/tccbot-backend/internal/strategies"
 
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
@@ -97,11 +99,13 @@ func main() {
 		testMode,
 	)
 
+	ordProc := orderproc.New(300, tradeApi, cfg, log)
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	wg := &sync.WaitGroup{}
-	strategiesType := strategies.New(wg, cfg, tradeApi, dbManager, log, initSignals)
+	strategiesType := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals)
 	strategiesType.Start()
 	<-done
 

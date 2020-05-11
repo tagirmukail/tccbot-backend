@@ -73,4 +73,5 @@ func registerAllTables(collection *migrations.Collection, log *logrus.Logger, cf
 	dbmigrations.RegisterBinSizeEnum(collection, log)
 	dbmigrations.RegisterSignalTypeEnum(collection, log)
 	dbmigrations.RegisterSignalTable(collection, log)
+	dbmigrations.RegisterOrdersTable(collection, log)
 }

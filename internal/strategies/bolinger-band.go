@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/internal/types"
+
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
@@ -49,7 +51,7 @@ func (s *Strategies) processBBStrategyCandles(binSize string, count int32) ([]bi
 		return nil, nil, err
 	}
 	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
-		Symbol:    s.cfg.ExchangesSettings.Bitmex.Currency,
+		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     count,
 		StartTime: from.Format(bitmex.TradeTimeFormat),
@@ -212,8 +214,15 @@ func (s *Strategies) upTrend(binSize models.BinSize, candles []bitmex.TradeBuck,
 	}
 
 	s.log.Infof("uptrend successfully completed for bin_size:%v and close:%v", binSize, candles[len(candles)-1].Close)
-	// todo sell order
 
+	for i := 0; i < s.cfg.Strategies.RetryProcessCount; i++ {
+		err := s.placeBitmexOrder(types.SideSell, models.BolingerBand)
+		if err != nil {
+			s.log.Warnf("placeBitmexOrder sell failed: %v", err)
+			continue
+		}
+		break
+	}
 }
 
 func (s *Strategies) downTrend(binSize models.BinSize, candles []bitmex.TradeBuck, signals []*models.Signal) {
@@ -234,5 +243,13 @@ func (s *Strategies) downTrend(binSize models.BinSize, candles []bitmex.TradeBuc
 		}
 	}
 	s.log.Infof("downtrend successfully completed for bin_size:%v and close:%v", binSize, candles[len(candles)-1].Close)
-	// todo buy order
+
+	for i := 0; i < s.cfg.Strategies.RetryProcessCount; i++ {
+		err := s.placeBitmexOrder(types.SideBuy, models.BolingerBand)
+		if err != nil {
+			s.log.Warnf("placeBitmexOrder buy failed: %v", err)
+			continue
+		}
+		break
+	}
 }

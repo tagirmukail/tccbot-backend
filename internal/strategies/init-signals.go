@@ -11,8 +11,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-// TODO добавить проверку на уже инициализированые по timestamp сигналы
-
 func (s *Strategies) SignalsInit() error {
 	for _, binSize := range s.cfg.Strategies.BinSizes {
 		err := s.binProcess(binSize)
@@ -37,12 +35,11 @@ func (s *Strategies) binProcess(binSize string) error {
 	}
 
 	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
-		Symbol:    s.cfg.ExchangesSettings.Bitmex.Currency,
+		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     int32(count),
 		StartTime: startTime.Format(bitmex.TradeTimeFormat),
 	})
-	err = s.checkCloses(candles)
 	if err != nil {
 		return err
 	}
@@ -96,6 +93,15 @@ func (s *Strategies) binProcess(binSize string) error {
 
 func (s *Strategies) macdSave(
 	timestamp time.Time, size models.BinSize, closes []float64, prevMACDHistVals []float64, step int) ([]float64, error) {
+	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.MACD}, []models.BinSize{size}, []time.Time{timestamp})
+	if err != nil {
+		return nil, err
+	}
+	if len(signals) != 0 {
+		s.log.Warnf("macd signal by ts: %v, and binsize: %v already exist", timestamp, size)
+		return prevMACDHistVals, nil
+	}
+
 	fastStartIndx, fastStopIndx := step-s.cfg.Strategies.MacdFastCount, step
 	slowStartIndx, slowStopIndx := step-s.cfg.Strategies.MacdSlowCount, step
 	fastValues := closes[fastStartIndx:fastStopIndx]
@@ -106,7 +112,7 @@ func (s *Strategies) macdSave(
 		prevMACDHistVals,
 		trademath.EMAIndication,
 	)
-	_, err := s.db.SaveSignal(models.Signal{
+	_, err = s.db.SaveSignal(models.Signal{
 		BinSize:            size,
 		MACDFast:           s.cfg.Strategies.MacdFastCount,
 		MACDSlow:           s.cfg.Strategies.MacdSlowCount,
@@ -125,10 +131,19 @@ func (s *Strategies) macdSave(
 
 func (s *Strategies) rsiSave(
 	timestamp time.Time, size models.BinSize, closes []float64, step int) error {
+	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.RSI}, []models.BinSize{size}, []time.Time{timestamp})
+	if err != nil {
+		return err
+	}
+	if len(signals) != 0 {
+		s.log.Warnf("rsi signal by ts: %v, and binsize: %v already exist", timestamp, size)
+		return nil
+	}
+
 	rsiStartIndx, rsiStopIndx := step-s.cfg.Strategies.RsiCount, step
 	rsiValues := closes[rsiStartIndx:rsiStopIndx]
 	rsi := s.tradeCalc.CalculateRSI(rsiValues, trademath.WMAIndication)
-	_, err := s.db.SaveSignal(models.Signal{
+	_, err = s.db.SaveSignal(models.Signal{
 		N:           len(rsiValues),
 		BinSize:     size,
 		Timestamp:   timestamp,
@@ -142,11 +157,19 @@ func (s *Strategies) otherSignals(timestamp time.Time, size models.BinSize, clos
 	if step < s.cfg.Strategies.GetCandlesCount {
 		return nil
 	}
+	sigs, err := s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, []time.Time{timestamp})
+	if err != nil {
+		return err
+	}
+	if len(sigs) != 0 {
+		s.log.Warnf("other signals by ts: %v, and binsize: %v already exist", timestamp, size)
+		return nil
+	}
 
 	maStartIndx, maStopIndx := step-s.cfg.Strategies.GetCandlesCount, step
 	values := closes[maStartIndx:maStopIndx]
 	signals := s.tradeCalc.CalculateSignals(values)
-	_, err := s.db.SaveSignal(models.Signal{
+	_, err = s.db.SaveSignal(models.Signal{
 		N:           len(values),
 		BinSize:     size,
 		Timestamp:   timestamp,
