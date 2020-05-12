@@ -5,7 +5,8 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
+
+	"github.com/tagirmukail/tccbot-backend/internal/types"
 
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 
@@ -29,6 +30,10 @@ type Strategies struct {
 	rsiPrev     struct {
 		minBorderInProc bool
 		maxBorderInProc bool
+	}
+	restarts struct {
+		restart5m bool
+		restart1h bool
 	}
 }
 
@@ -62,113 +67,39 @@ func (s *Strategies) Start() {
 	}
 	s.wgRunner.Add(1)
 	go s.start()
+	s.wgRunner.Add(1)
+	go s.orderProc.Start(s.wgRunner)
 	s.wgRunner.Wait()
 }
 
 func (s *Strategies) start() {
 	defer s.wgRunner.Done()
 
-	wg := &sync.WaitGroup{}
-	for _, binSize := range s.cfg.Strategies.BinSizes {
-		switch binSize {
-		case "5m":
-			wg.Add(1)
-			go s.process5mCandles(wg)
-		case "1h":
-			wg.Add(1)
-			go s.process1hCandles(wg)
-		case "15m":
-			//wg.Add(1)
-			//go s.process15Candles(wg)
-		case "1d":
-		// TODO add
-		default:
-			s.log.Fatalf("unknown bin_size: %s", binSize)
-		}
-
-	}
-	wg.Wait()
-}
-
-func (s *Strategies) process5mCandles(wg *sync.WaitGroup) {
-	defer wg.Done()
+	go s.tradeApi.GetBitmex().GetWS().Start()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
-
-	t := time.Now().UTC()
-	remainder := t.Minute() % 5
-
-	if remainder > 0 {
-		s.log.Infof("process 5m candles wait %d min", 5-remainder)
-		<-time.After(time.Duration(5-remainder)*time.Minute + time.Second)
-		s.log.Infof("process 5m candles wait %d min exceeded", 5-remainder)
-	} else {
-		time.Sleep(1 * time.Second)
-	}
-	s.processStrategies("5m", int32(s.cfg.Strategies.GetCandlesCount))
-
-	// for debug used 1m
-	tick := time.NewTicker(5 * time.Minute)
-	defer tick.Stop()
+	s.log.Infof("process messages from bitmex started")
 	for {
 		select {
-		case <-tick.C:
-			s.processStrategies("5m", int32(s.cfg.Strategies.GetCandlesCount))
 		case <-done:
-			s.log.Infof("5m candles process stopped")
+			s.log.Infof("process messages stopped")
 			return
-		}
-	}
-}
-
-// TODO fix for 15 min candles
-func (s *Strategies) process15Candles(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
-
-	tick := time.NewTicker(15 * time.Minute)
-	defer tick.Stop()
-	for {
-		select {
-		case <-tick.C:
-			s.processStrategies("15m", int32(s.cfg.Strategies.GetCandlesCount))
-		case <-done:
-			s.log.Infof("15m candles process stopped")
-			return
-		}
-	}
-}
-
-func (s *Strategies) process1hCandles(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
-
-	t := time.Now().UTC()
-	remainder := t.Minute() % 60
-
-	if remainder > 0 {
-		s.log.Infof("process 1h candles wait %d min", 60-remainder)
-		<-time.After(time.Duration(60-remainder)*time.Minute + time.Second)
-		s.log.Infof("process 1h candles wait %d min exceeded", 60-remainder)
-	} else {
-		time.Sleep(1 * time.Second)
-	}
-	s.processStrategies("1h", int32(s.cfg.Strategies.GetCandlesCount))
-
-	tick := time.NewTicker(1 * time.Hour)
-	defer tick.Stop()
-	for {
-		select {
-		case <-tick.C:
-			s.processStrategies("1h", int32(s.cfg.Strategies.GetCandlesCount))
-		case <-done:
-			s.log.Infof("1h candles process stopped")
-			return
+		case data := <-s.tradeApi.GetBitmex().GetWS().GetMessages():
+			if len(data.Data) == 0 {
+				continue
+			}
+			switch data.Table {
+			case string(types.TradeBin5m):
+				s.processStrategies("5m", int32(s.cfg.Strategies.GetCandlesCount))
+			case string(types.TradeBin1h):
+				s.processStrategies("1h", int32(s.cfg.Strategies.GetCandlesCount))
+			case string(types.TradeBin1d):
+				s.processStrategies("1d", int32(s.cfg.Strategies.GetCandlesCount))
+			default:
+				s.log.Warnf("processStrategies is not supported this trade bin: %v", data.Table)
+				continue
+			}
 		}
 	}
 }

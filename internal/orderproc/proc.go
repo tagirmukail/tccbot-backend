@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
@@ -38,20 +42,36 @@ func New(tickPeriodSec uint32, api tradeapi.Api, cfg *config.GlobalConfig, log *
 	}
 }
 
-// todo implement
-func (o *OrderProcessor) procTick() {
+func (o *OrderProcessor) Start(wg *sync.WaitGroup) {
+	o.log.Infof("order processor started")
+	defer func() {
+		o.log.Infof("order processor finished")
+		wg.Done()
+	}()
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
+
 	tick := time.NewTicker(o.tickPeriod)
 	defer tick.Stop()
 	for {
 		select {
+		case <-done:
+			return
 		case <-tick.C:
-			o.procActiveOrders()
+			err := o.procActiveOrders()
+			if err != nil {
+				o.log.Warnf("procActiveOrders failed: %v", err)
+			}
 		}
 	}
 
 }
 
 func (o *OrderProcessor) procActiveOrders() error {
+	o.log.Infof("start process active orders")
+	defer o.log.Infof("finish process active orders")
+
 	filter := fmt.Sprintf(`{"ordStatus":"%s"}`, types.OrdNew)
 	orders, err := o.api.GetBitmex().GetOrders(&bitmex.OrdersRequest{
 		Symbol: o.cfg.ExchangesSettings.Bitmex.Symbol,
@@ -62,20 +82,30 @@ func (o *OrderProcessor) procActiveOrders() error {
 	}
 
 	for _, order := range orders {
-		if time.Now().UTC().Sub(order.Timestamp) > o.tickPeriod {
-			_, err = o.api.GetBitmex().AmendOrder(&bitmex.OrderAmendParams{
-				OrigClOrdID:          order.OrderID,
-				PegOffsetValue:       0,
-				Price:                0,
-				SimpleLeavesQuantity: 0,
-				SimpleOrderQuantity:  0,
-				StopPx:               0,
-				Text:                 "",
+		duration := time.Now().UTC().Sub(order.Timestamp)
+		o.log.Debugf("order:%v duration: %v", order.OrderID, duration)
+		if duration > o.tickPeriod {
+			inst, err := o.getPrices()
+			if err != nil {
+				return err
+			}
+			var price float64
+			switch types.Side(order.Side) {
+			case types.SideSell:
+				price = inst.AskPrice
+			case types.SideBuy:
+				price = inst.BidPrice
+			}
+			ord, err := o.api.GetBitmex().AmendOrder(&bitmex.OrderAmendParams{
+				OrderID: order.OrderID,
+				Price:   price,
+				Text:    "amend order - proc active orders",
 			})
 			if err != nil {
 				o.log.Errorf("failed amend order:id:%s, error: %v", order.OrderID, err)
 				continue
 			}
+			o.log.Debugf("amend order successfully completed: %#v", ord)
 		}
 	}
 
@@ -98,17 +128,17 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 		var price float64
 		if side == types.SideSell {
-			if signalType == models.RSI {
-				price = inst.AskPrice + inst.AskPrice*0.09
-			} else {
-				price = inst.AskPrice
-			}
+			//if signalType == models.RSI {
+			//	price = inst.AskPrice
+			//} else {
+			price = inst.AskPrice
+			//}
 		} else {
-			if signalType == models.RSI {
-				price = inst.BidPrice + inst.BidPrice*0.09
-			} else {
-				price = inst.BidPrice
-			}
+			//if signalType == models.RSI {
+			//	price = inst.BidPrice
+			//} else {
+			price = inst.BidPrice
+			//}
 		}
 
 		params := &bitmex.OrderNewParams{
@@ -117,7 +147,6 @@ func (o *OrderProcessor) PlaceOrder(
 			OrderType: string(o.cfg.ExchangesSettings.Bitmex.OrderType),
 			OrderQty:  math.Round(amount),
 			Price:     price,
-			StopPx:    stopPx,
 		}
 		if close {
 			params.ExecInst = "Close"

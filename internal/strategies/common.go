@@ -2,7 +2,10 @@ package strategies
 
 import (
 	"errors"
+	"fmt"
 	"time"
+
+	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
@@ -12,6 +15,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
+
+const limitMinOnOrderQty = 2.5
 
 func (s *Strategies) fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	var result []float64
@@ -70,13 +75,13 @@ func (s *Strategies) checkCloses(candles []bitmex.TradeBuck) error {
 	return nil
 }
 
-func (s *Strategies) fetchMacdHistVals(signals []*models.Signal) []float64 {
+func (s *Strategies) fetchMacdVals(signals []*models.Signal) []float64 {
 	var result []float64
 	for _, signal := range signals {
-		if signal.MACDHistogramValue == 0 {
+		if signal.MACDValue == 0 {
 			continue
 		}
-		result = append(result, signal.MACDHistogramValue)
+		result = append(result, signal.MACDValue)
 	}
 	return result
 }
@@ -100,11 +105,12 @@ func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalT
 		s.log.Warnf("orderProc.GetBalance failed: %v", err)
 		return err
 	}
-	// fixme - return amount=0
-	amount := utils.RandomRange(2.5, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
-	if amount > balance {
-		amount = balance / 2
+	contracts := trademath.ConvertFromBTCToContracts(balance)
+	if contracts <= 3 {
+		return fmt.Errorf("balance is exhausted, %.3f left", balance)
 	}
+
+	amount := utils.RandomRange(limitMinOnOrderQty, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
 
 	ord, err := s.orderProc.PlaceOrder(types.Bitmex, signalType, side, amount, 0, false)
 	if err != nil {

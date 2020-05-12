@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
+
 	"github.com/sirupsen/logrus"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
@@ -16,11 +18,12 @@ const (
 )
 
 type Api interface {
-	GetBitmex() ExchangeApi
+	GetBitmex() BitmexApi
 }
 
-type ExchangeApi interface {
+type BitmexApi interface {
 	EnableTestNet()
+	GetWS() *ws.WS
 
 	// Bitmex
 	SetDefaultUserAgent(agent string)
@@ -29,11 +32,11 @@ type ExchangeApi interface {
 	GetUserMargin(currency string) (bitmex.UserMargin, error)
 	GetAllUserMargin() ([]bitmex.UserMargin, error)
 	GetUserWalletInfo(currency string) (bitmex.WalletInfo, error)
-	GetOrders(params *bitmex.OrdersRequest) ([]bitmex.Order, error)
+	GetOrders(params *bitmex.OrdersRequest) ([]bitmex.OrderCopied, error)
 	CreateOrder(params *bitmex.OrderNewParams) (bitmex.OrderCopied, error)
-	AmendOrder(params *bitmex.OrderAmendParams) (bitmex.Order, error)
-	CancelOrders(params *bitmex.OrderCancelParams) ([]bitmex.Order, error)
-	CancelAllOrders(params *bitmex.OrderCancelAllParams) ([]bitmex.Order, error)
+	AmendOrder(params *bitmex.OrderAmendParams) (bitmex.OrderCopied, error)
+	CancelOrders(params *bitmex.OrderCancelParams) ([]bitmex.OrderCopied, error)
+	CancelAllOrders(params *bitmex.OrderCancelAllParams) ([]bitmex.OrderCopied, error)
 	GetTradeBucketed(params *bitmex.TradeGetBucketedParams) ([]bitmex.TradeBuck, error)
 	LeveragePosition(params *bitmex.PositionUpdateLeverageParams) (bitmex.Position, error)
 	GetPositions(params bitmex.PositionGetParams) ([]bitmex.Position, error)
@@ -41,7 +44,7 @@ type ExchangeApi interface {
 }
 
 type TradeApi struct {
-	bitmex ExchangeApi
+	bitmex BitmexApi
 }
 
 func NewTradeApi(
@@ -49,6 +52,7 @@ func NewTradeApi(
 	bitmexSecret string,
 	log *logrus.Logger,
 	test bool,
+	ws *ws.WS,
 ) *TradeApi {
 	tapi := &TradeApi{
 		bitmex: bitmex.New(
@@ -60,6 +64,7 @@ func NewTradeApi(
 			defaultMaxIdleConns,
 			0,
 			0,
+			ws,
 			log,
 		),
 	}
@@ -69,6 +74,6 @@ func NewTradeApi(
 	return tapi
 }
 
-func (t *TradeApi) GetBitmex() ExchangeApi {
+func (t *TradeApi) GetBitmex() BitmexApi {
 	return t.bitmex
 }

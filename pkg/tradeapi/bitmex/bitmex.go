@@ -13,6 +13,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
+
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/crypto"
@@ -34,6 +36,7 @@ type Bitmex struct {
 	maxIdleConns     int
 	timeout          time.Duration
 	rwLock           sync.RWMutex
+	ws               *ws.WS
 }
 
 type Request struct {
@@ -56,6 +59,7 @@ func New(
 	maxIdleConns int,
 	maxRequestsLimit int32,
 	timeout time.Duration,
+	ws *ws.WS,
 	logger *logrus.Logger,
 ) *Bitmex {
 	if maxRequestsLimit == 0 {
@@ -73,11 +77,16 @@ func New(
 		maxIdleConns:     maxIdleConns,
 		timeout:          timeout,
 		rwLock:           sync.RWMutex{},
+		ws:               ws,
 	}
 }
 
 func (b *Bitmex) EnableTestNet() {
 	b.url = testnetUrl
+}
+
+func (b *Bitmex) GetWS() *ws.WS {
+	return b.ws
 }
 
 func (b *Bitmex) SetDefaultUserAgent(agent string) {
@@ -203,7 +212,6 @@ func (b *Bitmex) do(item *Request) error {
 		for k, v := range req.Header {
 			b.logger.Debugf("path:%s request header[%s]:%s", item.Path, k, v)
 		}
-		b.logger.Debugf("path:%s request body: %#v", item.Path, item.Body)
 	}
 
 	if atomic.LoadInt32(&b.requestsCount) >= b.maxRequestsLimit {

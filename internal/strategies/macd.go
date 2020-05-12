@@ -56,7 +56,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 	}
 	fastValues := closes[len(closes)-s.cfg.Strategies.MacdFastCount:]
 
-	macd := s.tradeCalc.CalculateMACD(fastValues, closes, s.fetchMacdHistVals(signals), trademath.EMAIndication)
+	macd := s.tradeCalc.CalculateMACD(fastValues, closes, s.fetchMacdVals(signals), trademath.EMAIndication)
 	signal := models.Signal{
 		MACDFast:           s.cfg.Strategies.MacdFastCount,
 		MACDSlow:           s.cfg.Strategies.MacdSlowCount,
@@ -65,6 +65,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 		Timestamp:          lastCandleTs,
 		SignalType:         models.MACD,
 		SignalValue:        macd.Sig,
+		MACDValue:          macd.Value,
 		MACDHistogramValue: macd.HistogramValue,
 	}
 	_, err = s.db.SaveSignal(signal)
@@ -80,18 +81,20 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 	}
 
 	s.log.Infof("processMACDSignals defined -->: %#v", macdDiverg)
-	//if macdDiverg.bearDiverg {
-	//	err := s.placeBitmexOrder(types.SideSell)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
-	//if macdDiverg.bullDiverg {
-	//	err := s.placeBitmexOrder(types.SideBuy)
-	//	if err != nil {
-	//		return err
-	//	}
-	//}
+	if macdDiverg.bearDiverg {
+		s.log.Infof("place sell order-------------->macd")
+		//	err := s.placeBitmexOrder(types.SideSell)
+		//	if err != nil {
+		//		return err
+		//	}
+	}
+	if macdDiverg.bullDiverg {
+		s.log.Infof("place buy order-------------->macd")
+		//	err := s.placeBitmexOrder(types.SideBuy)
+		//	if err != nil {
+		//		return err
+		//	}
+	}
 
 	return nil
 }

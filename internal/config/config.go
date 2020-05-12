@@ -34,6 +34,7 @@ type StrategiesConfig struct {
 	RsiCount           int
 	RsiMinBorder       uint32
 	RsiMaxBorder       uint32
+	RsiTradeCoef       float64
 	MacdFastCount      int
 	MacdSlowCount      int
 	MacdSigCount       int
@@ -158,6 +159,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		strategies.RsiCount = viper.GetInt("strategies.rsi_count")
 		strategies.RsiMinBorder = viper.GetUint32("strategies.rsi_min_border")
 		strategies.RsiMaxBorder = viper.GetUint32("strategies.rsi_max_border")
+		strategies.RsiTradeCoef = viper.GetFloat64("strategies.rsi_trade_coef")
 		for _, binSize := range strategies.BinSizes {
 			switch binSize {
 			case "5m", "15m", "1h", "1d":
@@ -186,6 +188,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		strategies.RsiCount = 14
 		strategies.RsiMinBorder = 30
 		strategies.RsiMaxBorder = 70
+		strategies.RsiTradeCoef = 0.0004
 		strategies.MacdFastCount = 12
 		strategies.MacdSlowCount = 26
 		strategies.MacdSigCount = 9

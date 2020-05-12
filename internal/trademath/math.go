@@ -25,6 +25,7 @@ type Singals struct {
 
 type MACD struct {
 	HistogramValue float64 // histogram value
+	Value          float64 // macd value
 	Sig            float64 // MACD signal curve
 }
 
@@ -60,9 +61,12 @@ func (c *Calc) CalculateMACD(
 	fastMA := maCalcFunc(fastValues)
 	slowMA := maCalcFunc(slowValues)
 
-	macd.HistogramValue = RoundFloat(fastMA-slowMA, 3)
-	prevMACDValues = append(prevMACDValues, macd.HistogramValue)
-	macd.Sig = c.SMACalc(prevMACDValues)
+	macd.Value = RoundFloat(fastMA-slowMA, 3)
+
+	prevMACDValues = append(prevMACDValues, macd.Value)
+	macd.Sig = c.EMACalc(prevMACDValues)
+
+	macd.HistogramValue = RoundFloat(macd.Value-macd.Sig, 3)
 	return macd
 }
 
@@ -235,4 +239,8 @@ func RemoveEmptyValues(indexes []float64, vals []float64) ([]float64, []float64)
 
 func ConvertToBTC(balance int64) float64 {
 	return float64(balance) / SatoshisPerBTC
+}
+
+func ConvertFromBTCToContracts(balance float64) float64 {
+	return balance * SatoshisPerBTC
 }

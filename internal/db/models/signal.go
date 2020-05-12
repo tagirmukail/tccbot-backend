@@ -31,6 +31,7 @@ type Signal struct {
 	BBTL               float64    `db:"bbtl"` // bolinger band top line
 	BBML               float64    `db:"bbml"` // bolinger band middle line
 	BBBL               float64    `db:"bbbl"` // bolinger band bottom line
+	MACDValue          float64    `db:"macd_v"`
 	MACDHistogramValue float64    `db:"macd_h_v"`
 	CreatedAt          int64      `db:"created_at"`
 	UpdatedAt          int64      `db:"updated_at"`

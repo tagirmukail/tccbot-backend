@@ -38,8 +38,8 @@ func (b *Bitmex) GetUserWalletInfo(currency string) (WalletInfo, error) {
 	)
 }
 
-func (b *Bitmex) GetOrders(params *OrdersRequest) ([]Order, error) {
-	var orders []Order
+func (b *Bitmex) GetOrders(params *OrdersRequest) ([]OrderCopied, error) {
+	var orders []OrderCopied
 	return orders, b.SendAuthenticatedRequest(
 		http.MethodGet,
 		endpointOrder,
@@ -59,8 +59,8 @@ func (b *Bitmex) CreateOrder(params *OrderNewParams) (OrderCopied, error) {
 }
 
 // AmendOrder amends the quantity or price of an open order
-func (b *Bitmex) AmendOrder(params *OrderAmendParams) (Order, error) {
-	var order Order
+func (b *Bitmex) AmendOrder(params *OrderAmendParams) (OrderCopied, error) {
+	var order OrderCopied
 	return order, b.SendAuthenticatedRequest(
 		http.MethodPut,
 		endpointOrder,
@@ -69,8 +69,8 @@ func (b *Bitmex) AmendOrder(params *OrderAmendParams) (Order, error) {
 	)
 }
 
-func (b *Bitmex) CancelOrders(params *OrderCancelParams) ([]Order, error) {
-	var orders []Order
+func (b *Bitmex) CancelOrders(params *OrderCancelParams) ([]OrderCopied, error) {
+	var orders []OrderCopied
 	return orders, b.SendAuthenticatedRequest(
 		http.MethodDelete,
 		endpointOrder,
@@ -79,8 +79,8 @@ func (b *Bitmex) CancelOrders(params *OrderCancelParams) ([]Order, error) {
 	)
 }
 
-func (b *Bitmex) CancelAllOrders(params *OrderCancelAllParams) ([]Order, error) {
-	var orders []Order
+func (b *Bitmex) CancelAllOrders(params *OrderCancelAllParams) ([]OrderCopied, error) {
+	var orders []OrderCopied
 	return orders, b.SendAuthenticatedRequest(
 		http.MethodDelete,
 		endpointAllOrders,

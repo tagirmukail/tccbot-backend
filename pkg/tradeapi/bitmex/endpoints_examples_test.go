@@ -67,6 +67,7 @@ func TestBitmex_GetAllUserMargin(t *testing.T) {
 				tt.fields.maxIdleConns,
 				0,
 				tt.fields.timeout,
+				nil,
 				logrus.New(),
 			)
 			b.EnableTestNet()
@@ -91,7 +92,7 @@ func TestBitmex_GetTradeBucketed(t *testing.T) {
 	t.Run("get trade bucketed", func(t *testing.T) {
 		b := New(
 			"", "", true, 2, defaultIdleConnTimeout,
-			10, 50, 0, logrus.New(),
+			10, 50, 0, nil, logrus.New(),
 		)
 
 		b.EnableTestNet()
@@ -162,6 +163,7 @@ func TestBitmex_GetPositions(t *testing.T) {
 				tt.fields.maxIdleConns,
 				0,
 				tt.fields.timeout,
+				nil,
 				logrus.New(),
 			)
 			b.EnableTestNet()
@@ -228,6 +230,7 @@ func TestBitmex_CreateOrder(t *testing.T) {
 				tt.fields.maxIdleConns,
 				0,
 				tt.fields.timeout,
+				nil,
 				logrus.New(),
 			)
 			b.EnableTestNet()
@@ -236,6 +239,70 @@ func TestBitmex_CreateOrder(t *testing.T) {
 			asserter.NoError(err)
 			asserter.NotEmpty(got)
 			t.Logf("%#v", got)
+		})
+	}
+}
+
+func TestBitmex_GetOrders(t *testing.T) {
+	asserter := require.New(t)
+	envs := getEnvs(t)
+
+	type fields struct {
+		retryCount      int
+		idleConnTimeout time.Duration
+		maxIdleConns    int
+		timeout         time.Duration
+	}
+	type args struct {
+		params *OrdersRequest
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []Order
+		wantErr bool
+	}{
+		{
+			name: "ok",
+			fields: fields{
+				retryCount:      2,
+				idleConnTimeout: 15 * time.Second,
+				maxIdleConns:    10,
+				timeout:         0,
+			},
+			args: args{
+				params: &OrdersRequest{
+					//Filter: `{"ordStatus":"New"}`,
+					Symbol: "XBTUSD",
+				},
+			},
+			want:    []Order{},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := New(
+				envs[keyEnv],
+				envs[secretKeyEnv],
+				true,
+				tt.fields.retryCount,
+				tt.fields.idleConnTimeout,
+				tt.fields.maxIdleConns,
+				0,
+				tt.fields.timeout,
+				nil,
+				logrus.New(),
+			)
+			b.EnableTestNet()
+
+			got, err := b.GetOrders(tt.args.params)
+			asserter.NoError(err)
+			//asserter.NotEmpty(tt.want, got)
+			for _, ord := range got {
+				t.Logf("\n------------->%#v\n", ord)
+			}
 		})
 	}
 }

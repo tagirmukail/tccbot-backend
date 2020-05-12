@@ -23,6 +23,7 @@ func RegisterSignalTable(collections *migrations.Collection, log *logrus.Logger)
 					bbtl 	   float4,
 					bbml	   float4,
 					bbbl 	   float4,
+					macd_v     float4,
 					macd_h_v   float4,
 					created_at bigint NOT NULL,
     				updated_at bigint NOT NULL

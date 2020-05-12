@@ -65,8 +65,10 @@ func (s *Strategies) processRsiStrategy(binSize string) error {
 
 	if rsi.Value >= float64(s.cfg.Strategies.RsiMaxBorder) {
 		s.rsiPrev.maxBorderInProc = true
+		s.rsiPrev.maxBorderInProc = false
 		s.log.Infof("max border is overcome up")
 	} else if rsi.Value <= float64(s.cfg.Strategies.RsiMinBorder) {
+		s.rsiPrev.maxBorderInProc = true
 		s.rsiPrev.maxBorderInProc = false
 		s.log.Infof("min border is overcome - down")
 	} else {

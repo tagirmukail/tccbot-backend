@@ -44,11 +44,12 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
                     bbtl,
                     bbml,
                     bbbl,
+                    macd_v,
                     macd_h_v,
                     created_at,
                     updated_at
 	) VALUES (
-	          $1, $2,$3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
+	          $1, $2,$3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
 	) RETURNING id`,
 		data.N,
 		data.MACDFast,
@@ -61,6 +62,7 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
 		data.BBTL,
 		data.BBML,
 		data.BBBL,
+		data.MACDValue,
 		data.MACDHistogramValue,
 		data.CreatedAt,
 		data.UpdatedAt,

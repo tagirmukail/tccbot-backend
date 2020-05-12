@@ -2,11 +2,15 @@ package main
 
 import (
 	"flag"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"sync"
 	"syscall"
+
+	"github.com/tagirmukail/tccbot-backend/internal/types"
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
 
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 
@@ -22,8 +26,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
-
-// TODO добавить инициализацию предыдущих сигналов если отсутствуют
 
 func main() {
 	var (
@@ -92,11 +94,41 @@ func main() {
 		return
 	}
 
+	var bitmexUrl url.URL
+	if testMode {
+		bitmexUrl = url.URL{Scheme: "wss", Host: "testnet.bitmex.com", Path: "realtime"}
+	} else {
+		bitmexUrl = url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"}
+	}
+
+	var themes []types.Theme
+	for _, bin := range cfg.Strategies.BinSizes {
+		switch bin {
+		case "5m":
+			themes = append(themes, types.TradeBin5m)
+		case "1h":
+			themes = append(themes, types.TradeBin1h)
+		case "1d":
+			themes = append(themes, types.TradeBin1d)
+		default:
+			log.Fatalf("unknown bin_size: %v", bin)
+			return
+		}
+	}
+
 	tradeApi := tradeapi.NewTradeApi(
 		cfg.Accesses.Bitmex.Key,
 		cfg.Accesses.Bitmex.Secret,
 		log,
 		testMode,
+		ws.NewWS(
+			log,
+			bitmexUrl,
+			cfg.ExchangesSettings.Bitmex.PingSec,
+			cfg.ExchangesSettings.Bitmex.TimeoutSec,
+			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
+			themes,
+		),
 	)
 
 	ordProc := orderproc.New(300, tradeApi, cfg, log)

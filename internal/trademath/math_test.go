@@ -329,8 +329,9 @@ func TestCalc_CalculateMACD(t *testing.T) {
 				indication: EMAIndication,
 			},
 			want: MACD{
-				HistogramValue: 3.857,
-				Sig:            0.8452,
+				HistogramValue: 2.907,
+				Value:          3.857,
+				Sig:            0.9514,
 			},
 		},
 	}

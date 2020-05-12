@@ -120,6 +120,7 @@ func (s *Strategies) macdSave(
 		Timestamp:          timestamp,
 		SignalType:         models.MACD,
 		SignalValue:        macd.Sig,
+		MACDValue:          macd.Value,
 		MACDHistogramValue: macd.HistogramValue,
 	})
 	if err != nil {
@@ -150,6 +151,17 @@ func (s *Strategies) rsiSave(
 		SignalType:  models.RSI,
 		SignalValue: rsi.Value,
 	})
+
+	if rsi.Value >= float64(s.cfg.Strategies.RsiMaxBorder) {
+		s.rsiPrev.maxBorderInProc = true
+		s.log.Infof("max border is overcome up")
+	} else if rsi.Value <= float64(s.cfg.Strategies.RsiMinBorder) {
+		s.rsiPrev.maxBorderInProc = true
+		s.log.Infof("min border is overcome - down")
+	} else {
+		s.rsiPrev.maxBorderInProc = false
+		s.rsiPrev.minBorderInProc = false
+	}
 	return err
 }
 
