@@ -4,15 +4,16 @@ import (
 	"errors"
 	"time"
 
+	"github.com/markcheno/go-talib"
+
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
 func (s *Strategies) SignalsInit() error {
-	for _, binSize := range s.cfg.Strategies.BinSizes {
+	for _, binSize := range s.cfg.GlobStrategies.GetBinSizes() {
 		err := s.binProcess(binSize)
 		if err != nil {
 			return err
@@ -27,7 +28,7 @@ func (s *Strategies) binProcess(binSize string) error {
 		return err
 	}
 
-	count := s.cfg.Strategies.MacdSlowCount + s.cfg.Strategies.MacdSigCount
+	count := s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount * 2
 
 	startTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
 	if err != nil {
@@ -48,15 +49,12 @@ func (s *Strategies) binProcess(binSize string) error {
 		return err
 	}
 	closes := s.fetchCloses(candles)
-	if len(closes) < s.cfg.Strategies.MacdSlowCount {
+	if len(closes) < s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount {
 		return errors.New("candles less than macd slow count")
 	}
-	var (
-		prevMACDHistVals []float64
-	)
 
 	var step int
-	for i := len(candles) - s.cfg.Strategies.MacdSigCount; i < len(candles); i++ {
+	for i := len(candles) - s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount; i < len(candles); i++ {
 		// need for save signal into db
 		candle := candles[i]
 		timestamp, err := time.Parse(
@@ -68,7 +66,7 @@ func (s *Strategies) binProcess(binSize string) error {
 		}
 
 		// MACD
-		prevMACDHistVals, err = s.macdSave(timestamp, binType, closes, prevMACDHistVals, i)
+		err = s.macdSave(timestamp, binType, closes[:i], i)
 		if err != nil {
 			return err
 		}
@@ -92,31 +90,22 @@ func (s *Strategies) binProcess(binSize string) error {
 }
 
 func (s *Strategies) macdSave(
-	timestamp time.Time, size models.BinSize, closes []float64, prevMACDHistVals []float64, step int) ([]float64, error) {
-	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.MACD}, []models.BinSize{size}, []time.Time{timestamp})
-	if err != nil {
-		return nil, err
-	}
-	if len(signals) != 0 {
-		s.log.Warnf("macd signal by ts: %v, and binsize: %v already exist", timestamp, size)
-		return prevMACDHistVals, nil
-	}
+	timestamp time.Time, size models.BinSize, closes []float64, step int) error {
 
-	fastStartIndx, fastStopIndx := step-s.cfg.Strategies.MacdFastCount, step
-	slowStartIndx, slowStopIndx := step-s.cfg.Strategies.MacdSlowCount, step
-	fastValues := closes[fastStartIndx:fastStopIndx]
-	slowValues := closes[slowStartIndx:slowStopIndx]
-	macd := s.tradeCalc.CalculateMACD(
-		fastValues,
-		slowValues,
-		prevMACDHistVals,
-		trademath.EMAIndication,
+	macd := s.tradeCalc.CalcMACD(
+		closes,
+		s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdFastCount,
+		talib.EMA,
+		s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdSlowCount,
+		talib.EMA,
+		s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdSigCount,
+		talib.WMA,
 	)
-	_, err = s.db.SaveSignal(models.Signal{
+	_, err := s.db.SaveSignal(models.Signal{
 		BinSize:            size,
-		MACDFast:           s.cfg.Strategies.MacdFastCount,
-		MACDSlow:           s.cfg.Strategies.MacdSlowCount,
-		MACDSig:            s.cfg.Strategies.MacdSigCount,
+		MACDFast:           s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdFastCount,
+		MACDSlow:           s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdSlowCount,
+		MACDSig:            s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).MacdSigCount,
 		Timestamp:          timestamp,
 		SignalType:         models.MACD,
 		SignalValue:        macd.Sig,
@@ -124,10 +113,9 @@ func (s *Strategies) macdSave(
 		MACDHistogramValue: macd.HistogramValue,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	prevMACDHistVals = append(prevMACDHistVals, macd.HistogramValue)
-	return prevMACDHistVals, nil
+	return nil
 }
 
 func (s *Strategies) rsiSave(
@@ -137,26 +125,39 @@ func (s *Strategies) rsiSave(
 		return err
 	}
 	if len(signals) != 0 {
+		if signals[0].SignalValue >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder) {
+			s.rsiPrev.maxBorderInProc = true
+			s.rsiPrev.minBorderInProc = false
+			s.log.Infof("max border is overcome up")
+		} else if signals[0].SignalValue <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder) {
+			s.rsiPrev.minBorderInProc = true
+			s.rsiPrev.maxBorderInProc = false
+			s.log.Infof("min border is overcome - down")
+		} else {
+			s.rsiPrev.maxBorderInProc = false
+			s.rsiPrev.minBorderInProc = false
+		}
 		s.log.Warnf("rsi signal by ts: %v, and binsize: %v already exist", timestamp, size)
 		return nil
 	}
 
-	rsiStartIndx, rsiStopIndx := step-s.cfg.Strategies.RsiCount, step
-	rsiValues := closes[rsiStartIndx:rsiStopIndx]
-	rsi := s.tradeCalc.CalculateRSI(rsiValues, trademath.WMAIndication)
+	rsiValues := closes[:step]
+	rsi := s.tradeCalc.CalcRSI(rsiValues, s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiCount-1)
 	_, err = s.db.SaveSignal(models.Signal{
-		N:           len(rsiValues),
+		N:           s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiCount,
 		BinSize:     size,
 		Timestamp:   timestamp,
 		SignalType:  models.RSI,
 		SignalValue: rsi.Value,
 	})
 
-	if rsi.Value >= float64(s.cfg.Strategies.RsiMaxBorder) {
+	if rsi.Value >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder) {
 		s.rsiPrev.maxBorderInProc = true
+		s.rsiPrev.minBorderInProc = false
 		s.log.Infof("max border is overcome up")
-	} else if rsi.Value <= float64(s.cfg.Strategies.RsiMinBorder) {
-		s.rsiPrev.maxBorderInProc = true
+	} else if rsi.Value <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder) {
+		s.rsiPrev.minBorderInProc = true
+		s.rsiPrev.maxBorderInProc = false
 		s.log.Infof("min border is overcome - down")
 	} else {
 		s.rsiPrev.maxBorderInProc = false
@@ -166,7 +167,7 @@ func (s *Strategies) rsiSave(
 }
 
 func (s *Strategies) otherSignals(timestamp time.Time, size models.BinSize, closes []float64, step int) error {
-	if step < s.cfg.Strategies.GetCandlesCount {
+	if step < s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).GetCandlesCount {
 		return nil
 	}
 	sigs, err := s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, []time.Time{timestamp})
@@ -178,9 +179,9 @@ func (s *Strategies) otherSignals(timestamp time.Time, size models.BinSize, clos
 		return nil
 	}
 
-	maStartIndx, maStopIndx := step-s.cfg.Strategies.GetCandlesCount, step
+	maStartIndx, maStopIndx := step-s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).GetCandlesCount, step
 	values := closes[maStartIndx:maStopIndx]
-	signals := s.tradeCalc.CalculateSignals(values)
+	signals := s.tradeCalc.CalcSignals(values, talib.EMA)
 	_, err = s.db.SaveSignal(models.Signal{
 		N:           len(values),
 		BinSize:     size,

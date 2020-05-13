@@ -41,7 +41,8 @@ type BitmexIncomingData struct {
 }
 
 func (b *BitmexData) Validate() error {
-	if b.Table != string(types.TradeBin5m) &&
+	if b.Table != string(types.TradeBin1m) &&
+		b.Table != string(types.TradeBin5m) &&
 		b.Table != string(types.TradeBin1h) &&
 		b.Table != string(types.TradeBin1d) {
 		return fmt.Errorf("bad table:%v", b.Table)

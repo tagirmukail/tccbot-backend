@@ -50,3 +50,52 @@ strategies:
   macd_fast_count: 12
   macd_slow_count: 26
   macd_sig_count: 9
+
+strategies_g:
+  1m:
+    enable_bb: false # enable bolinger band strategy
+    enable_macd: false # enable macd strategy
+    enable_rsi: false # enable rsi strategy
+    bin_sizes: ["5m","1h"] # 5m,1h,1d
+    retry_process_count: 5
+    bb_last_candles_count: 4
+    get_candles_count: 30
+    rsi_count: 14
+    rsi_min_border: 30
+    rsi_max_border: 70
+    rsi_trade_coef: 0.0004
+    macd_fast_count: 12
+    macd_slow_count: 26
+    macd_sig_count: 9
+  5m:
+    enable_bb: true # enable bolinger band strategy
+    enable_macd: true # enable macd strategy
+    enable_rsi: true # enable rsi strategy
+    bin_sizes: ["5m","1h"] # 5m,1h,1d
+    retry_process_count: 5
+    bb_last_candles_count: 4
+    get_candles_count: 30
+    rsi_count: 14
+    rsi_min_border: 30
+    rsi_max_border: 70
+    rsi_trade_coef: 0.0004
+    macd_fast_count: 12
+    macd_slow_count: 26
+    macd_sig_count: 9
+  1h:
+    enable_bb: false # enable bolinger band strategy
+    enable_macd: false # enable macd strategy
+    enable_rsi: false # enable rsi strategy
+    bin_sizes: ["5m","1h"] # 5m,1h,1d
+    retry_process_count: 5
+    bb_last_candles_count: 4
+    get_candles_count: 30
+    rsi_count: 14
+    rsi_min_border: 30
+    rsi_max_border: 70
+    rsi_trade_coef: 0.0004
+    macd_fast_count: 12
+    macd_slow_count: 26
+    macd_sig_count: 9
+
+ord_proc_period_sec: 180

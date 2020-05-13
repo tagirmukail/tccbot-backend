@@ -59,7 +59,7 @@ func New(
 }
 
 func (s *Strategies) Start() {
-	if s.initSignals {
+	if s.initSignals { // is not needed
 		err := s.SignalsInit()
 		if err != nil {
 			s.log.Fatalf("SignalsInit failed: %v", err)
@@ -90,12 +90,14 @@ func (s *Strategies) start() {
 				continue
 			}
 			switch data.Table {
+			case string(types.TradeBin1m):
+				s.processStrategies("1m")
 			case string(types.TradeBin5m):
-				s.processStrategies("5m", int32(s.cfg.Strategies.GetCandlesCount))
+				s.processStrategies("5m")
 			case string(types.TradeBin1h):
-				s.processStrategies("1h", int32(s.cfg.Strategies.GetCandlesCount))
+				s.processStrategies("1h")
 			case string(types.TradeBin1d):
-				s.processStrategies("1d", int32(s.cfg.Strategies.GetCandlesCount))
+				s.processStrategies("1d")
 			default:
 				s.log.Warnf("processStrategies is not supported this trade bin: %v", data.Table)
 				continue
@@ -104,20 +106,33 @@ func (s *Strategies) start() {
 	}
 }
 
-func (s *Strategies) processStrategies(binSize string, count int32) {
-	if s.cfg.Strategies.EnableBolingerBand {
-		err := s.processBBStrategy(binSize, count)
+func (s *Strategies) processStrategies(binSize string) {
+	strategiesConfig := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
+	if strategiesConfig == nil {
+		s.log.Warnf("strategies not installed for bin_size:%s", binSize)
+		return
+	}
+	if !strategiesConfig.AnyStrategyEnabled() {
+		s.log.Warnf("all strategies disabled for bin_size:%s", binSize)
+		return
+	}
+
+	s.log.Infof("\n-------------------------------------\nstart strategies - bin size: %s", binSize)
+	defer s.log.Infof("finished strategies - bin size: %s\n-------------------------------------", binSize)
+
+	if strategiesConfig.EnableBolingerBand {
+		err := s.processBBStrategy(binSize, int32(strategiesConfig.GetCandlesCount))
 		if err != nil {
 			s.log.Errorf("processBBStrategy error: %v", err)
 		}
 	}
-	if s.cfg.Strategies.EnableMACD {
+	if strategiesConfig.EnableMACD {
 		err := s.processMACDStrategy(binSize)
 		if err != nil {
 			s.log.Errorf("processMACDStrategy error: %v", err)
 		}
 	}
-	if s.cfg.Strategies.EnableRSI {
+	if strategiesConfig.EnableRSI {
 		err := s.processRsiStrategy(binSize)
 		if err != nil {
 			s.log.Errorf("processRsiStrategy error: %v", err)

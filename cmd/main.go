@@ -9,22 +9,16 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/tagirmukail/tccbot-backend/internal/types"
-	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
-
-	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
-
-	"github.com/tagirmukail/tccbot-backend/internal/strategies"
-
-	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
-
-	"github.com/tagirmukail/tccbot-backend/internal/db"
+	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
-
+	"github.com/tagirmukail/tccbot-backend/internal/db"
+	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+	"github.com/tagirmukail/tccbot-backend/internal/strategies"
+	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/internal/utils/logger"
-
-	"github.com/sirupsen/logrus"
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
 )
 
 func main() {
@@ -78,8 +72,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Infof("configuration: %#v", cfg)
-
 	if migrationOnly {
 		log.Info("migrations started")
 	}
@@ -101,20 +93,7 @@ func main() {
 		bitmexUrl = url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"}
 	}
 
-	var themes []types.Theme
-	for _, bin := range cfg.Strategies.BinSizes {
-		switch bin {
-		case "5m":
-			themes = append(themes, types.TradeBin5m)
-		case "1h":
-			themes = append(themes, types.TradeBin1h)
-		case "1d":
-			themes = append(themes, types.TradeBin1d)
-		default:
-			log.Fatalf("unknown bin_size: %v", bin)
-			return
-		}
-	}
+	var themes = cfg.GlobStrategies.GetThemes()
 
 	tradeApi := tradeapi.NewTradeApi(
 		cfg.Accesses.Bitmex.Key,
@@ -128,10 +107,11 @@ func main() {
 			cfg.ExchangesSettings.Bitmex.TimeoutSec,
 			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
 			themes,
+			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
 		),
 	)
 
-	ordProc := orderproc.New(300, tradeApi, cfg, log)
+	ordProc := orderproc.New(tradeApi, cfg, log)
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)

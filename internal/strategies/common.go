@@ -41,8 +41,8 @@ func (s *Strategies) fetchTsFromCandles(candles []bitmex.TradeBuck) ([]time.Time
 	return result, nil
 }
 
-func (s *Strategies) fetchLastCandlesForBB(candles []bitmex.TradeBuck) []bitmex.TradeBuck {
-	lastIndx := len(candles) - s.cfg.Strategies.BBLastCandlesCount
+func (s *Strategies) fetchLastCandlesForBB(binSize string, candles []bitmex.TradeBuck) []bitmex.TradeBuck {
+	lastIndx := len(candles) - s.cfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount
 	if lastIndx < 0 {
 		return nil
 	}
@@ -56,7 +56,7 @@ func (s *Strategies) retryProcess(
 	retryFunc func(candles []bitmex.TradeBuck, binSize models.BinSize) error,
 ) error {
 	var err error
-	for i := 0; i < s.cfg.Strategies.RetryProcessCount; i++ {
+	for i := 0; i < s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String()).RetryProcessCount; i++ {
 		err = retryFunc(candles, binSize)
 		if err == nil {
 			break

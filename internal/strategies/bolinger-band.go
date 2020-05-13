@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tagirmukail/tccbot-backend/internal/types"
+	"github.com/markcheno/go-talib"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
+	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
@@ -60,7 +61,7 @@ func (s *Strategies) processBBStrategyCandles(binSize string, count int32) ([]bi
 		s.log.Errorf("processBBStrategyCandles tradeApi.GetBitmex().GetTradeBucketed error: %v", err)
 		return nil, nil, err
 	}
-	if len(candles) < s.cfg.Strategies.BBLastCandlesCount {
+	if len(candles) < s.cfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount {
 		s.log.Debug("processBBStrategyCandles there are fewer candles than necessary for the signal bolinger band")
 		return nil, nil, errors.New("there are fewer candles than necessary for the signal bolinger band")
 	}
@@ -77,14 +78,16 @@ func (s *Strategies) processBBStrategyCandles(binSize string, count int32) ([]bi
 		s.log.Debugf("processBBStrategyCandles last candle timestamp parse error: %v", err)
 		return nil, nil, err
 	}
-	signals := s.tradeCalc.CalculateSignals(closes)
+	signals := s.tradeCalc.CalcSignals(closes, talib.EMA)
 	err = s.saveSignals(lastCandleTs, bin, int(count), &signals)
 	if err != nil {
 		s.log.Debugf("processBBStrategyCandles db.SaveSignal error: %v", err)
 		return nil, nil, err
 	}
 
-	s.log.Debugf("processed signals - close: %v for bin size:%s - signals: %#v", candles[len(candles)-1].Close, binSize, signals)
+	s.log.Debugf(
+		"processed signals\nclose: %v\nbin size:%s\nBBTL:%v\nBBML:%v\nBBBL:%v",
+		candles[len(candles)-1].Close, binSize, signals.BB.TL, signals.BB.ML, signals.BB.BL)
 	return candles, &signals, err
 }
 
@@ -153,7 +156,7 @@ func (s *Strategies) saveSignals(timestamp time.Time, bin models.BinSize, n int,
 func (s *Strategies) processBB(
 	candles []bitmex.TradeBuck, binSize models.BinSize,
 ) error {
-	lastCandles := s.fetchLastCandlesForBB(candles)
+	lastCandles := s.fetchLastCandlesForBB(binSize.String(), candles)
 	if len(lastCandles) == 0 {
 		err := errors.New("processBB last candles fo BB signal is empty")
 		s.log.Debug(err)
@@ -215,7 +218,7 @@ func (s *Strategies) upTrend(binSize models.BinSize, candles []bitmex.TradeBuck,
 
 	s.log.Infof("uptrend successfully completed for bin_size:%v and close:%v", binSize, candles[len(candles)-1].Close)
 
-	for i := 0; i < s.cfg.Strategies.RetryProcessCount; i++ {
+	for i := 0; i < s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String()).RetryProcessCount; i++ {
 		err := s.placeBitmexOrder(types.SideSell, models.BolingerBand)
 		if err != nil {
 			s.log.Warnf("placeBitmexOrder sell failed: %v", err)
@@ -244,7 +247,7 @@ func (s *Strategies) downTrend(binSize models.BinSize, candles []bitmex.TradeBuc
 	}
 	s.log.Infof("downtrend successfully completed for bin_size:%v and close:%v", binSize, candles[len(candles)-1].Close)
 
-	for i := 0; i < s.cfg.Strategies.RetryProcessCount; i++ {
+	for i := 0; i < s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String()).RetryProcessCount; i++ {
 		err := s.placeBitmexOrder(types.SideBuy, models.BolingerBand)
 		if err != nil {
 			s.log.Warnf("placeBitmexOrder buy failed: %v", err)

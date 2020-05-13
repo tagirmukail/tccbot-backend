@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/markcheno/go-talib"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,25 +34,35 @@ func TestCalc_CalculateSignals(t *testing.T) {
 					1108,
 					1120,
 					1122,
+					1100,
+					1115,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
 				},
 			},
 			want: Singals{
 				SMA: 1112,
 				WMA: 1113.0909,
-				EMA: 1113.3636,
+				EMA: 1112,
 				BB: struct {
 					TL float64
 					ML float64
 					BL float64
-				}{1125.3447, 1112, 1098.6554},
+				}{1127.5791, 1111.4, 1095.221},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
-			got := c.CalculateSignals(tt.args.values)
-			assertr.Equal(got, tt.want)
+			got := c.CalcSignals(tt.args.values, talib.SMA)
+			assertr.Equal(tt.want, got)
 		})
 	}
 }
@@ -111,7 +123,7 @@ func BenchmarkCalc_CalculateSignals(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
 			c := &Calc{}
-			c.CalculateSignals(tt.args.values)
+			c.CalcSignals(tt.args.values, talib.SMA)
 		})
 	}
 }
@@ -137,7 +149,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 		want RSI
 	}{
 		{
-			name: "by sma",
+			name: "ok",
 			args: args{
 				values: []float64{
 					1100,
@@ -154,105 +166,33 @@ func TestCalc_CalculateRSI(t *testing.T) {
 					1130,
 					1128,
 					1120,
+					1120,
+					1122,
+					1125,
+					1130,
+					1128,
+					1120,
+					1118,
+					1110,
+					1105,
+					1102,
+					1108,
+					1120,
+					1122,
+					1110,
+					1105,
 				},
 				indication: SMAIndication,
 			},
 			want: RSI{
-				Value: 59.503,
-			},
-		},
-		{
-			name: "by ema",
-			args: args{
-				values: []float64{
-					1100,
-					1115,
-					1120,
-					1118,
-					1110,
-					1105,
-					1102,
-					1108,
-					1120,
-					1122,
-					1125,
-					1130,
-					1128,
-					1120,
-				},
-				indication: EMAIndication,
-			},
-			want: RSI{
-				Value: 49.771,
-			},
-		},
-		{
-			name: "by wma",
-			args: args{
-				values: []float64{
-					1100,
-					1115,
-					1120,
-					1118,
-					1110,
-					1105,
-					1102,
-					1108,
-					1120,
-					1122,
-					1125,
-					1130,
-					1128,
-					1120,
-				},
-				indication: WMAIndication,
-			},
-			want: RSI{
-				Value: 52.861,
-			},
-		},
-		{
-			name: "unknown indication",
-			args: args{
-				values: []float64{
-					1100,
-					1115,
-					1120,
-					1118,
-					1110,
-					1105,
-					1102,
-					1108,
-					1120,
-					1122,
-					1125,
-					1130,
-					1128,
-					1120,
-				},
-				indication: 10,
-			},
-			want: RSI{
-				Value: 0,
-			},
-		},
-		{
-			name: "values less than 2",
-			args: args{
-				values: []float64{
-					1100,
-				},
-				indication: SMAIndication,
-			},
-			want: RSI{
-				Value: 0,
+				Value: 46.6843,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
-			got := c.CalculateRSI(tt.args.values, tt.args.indication)
+			got := c.CalcRSI(tt.args.values, 14)
 			assertr.Equal(tt.want, got, "rsi calculation")
 		})
 	}
@@ -261,10 +201,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 func TestCalc_CalculateMACD(t *testing.T) {
 	assertr := assert.New(t)
 	type args struct {
-		fastValues     []float64
-		slowValues     []float64
-		prevMACDValues []float64
-		indication     MAIndication
+		values []float64
 	}
 	tests := []struct {
 		name string
@@ -274,7 +211,7 @@ func TestCalc_CalculateMACD(t *testing.T) {
 		{
 			name: "ok",
 			args: args{
-				fastValues: []float64{
+				values: []float64{
 					1120,
 					1118,
 					1110,
@@ -287,8 +224,6 @@ func TestCalc_CalculateMACD(t *testing.T) {
 					1130,
 					1128,
 					1120,
-				},
-				slowValues: []float64{
 					1138,
 					1134,
 					1128,
@@ -316,17 +251,6 @@ func TestCalc_CalculateMACD(t *testing.T) {
 					1128,
 					1120,
 				},
-				prevMACDValues: []float64{
-					3.20,
-					-2.11,
-					3.01,
-					1.15,
-					-4,
-					-1,
-					1.2,
-					2.3,
-				},
-				indication: EMAIndication,
 			},
 			want: MACD{
 				HistogramValue: 2.907,
@@ -338,7 +262,7 @@ func TestCalc_CalculateMACD(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
-			got := c.CalculateMACD(tt.args.fastValues, tt.args.slowValues, tt.args.prevMACDValues, tt.args.indication)
+			got := c.CalcMACD(tt.args.values, 14, talib.EMA, 26, talib.EMA, 9, talib.WMA)
 			assertr.Equal(tt.want, got, "MACD calculation")
 		})
 	}

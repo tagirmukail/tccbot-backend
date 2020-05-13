@@ -7,7 +7,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
@@ -21,14 +20,15 @@ func (s *Strategies) processRsiStrategy(binSize string) error {
 		return err
 	}
 
-	startTime, err := utils.FromTime(time.Now().UTC(), binSize, s.cfg.Strategies.RsiCount)
+	count := s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiCount * 2
+	startTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
 	if err != nil {
 		return err
 	}
 	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
 		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
-		Count:     int32(s.cfg.Strategies.RsiCount),
+		Count:     int32(count),
 		StartTime: startTime.Format(bitmex.TradeTimeFormat),
 	})
 	if err != nil {
@@ -39,7 +39,7 @@ func (s *Strategies) processRsiStrategy(binSize string) error {
 		return err
 	}
 	closes := s.fetchCloses(candles)
-	if len(closes) < s.cfg.Strategies.RsiCount {
+	if len(closes) < s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiCount {
 		return errors.New("candles less than rsi count")
 	}
 
@@ -51,9 +51,9 @@ func (s *Strategies) processRsiStrategy(binSize string) error {
 		return err
 	}
 
-	rsi := s.tradeCalc.CalculateRSI(closes, trademath.WMAIndication)
+	rsi := s.tradeCalc.CalcRSI(closes, s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiCount)
 	_, err = s.db.SaveSignal(models.Signal{
-		N:           len(candles),
+		N:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiCount,
 		BinSize:     bin,
 		Timestamp:   timestamp,
 		SignalType:  models.RSI,
@@ -63,12 +63,12 @@ func (s *Strategies) processRsiStrategy(binSize string) error {
 		return err
 	}
 
-	if rsi.Value >= float64(s.cfg.Strategies.RsiMaxBorder) {
+	if rsi.Value >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiMaxBorder) {
 		s.rsiPrev.maxBorderInProc = true
-		s.rsiPrev.maxBorderInProc = false
+		s.rsiPrev.minBorderInProc = false
 		s.log.Infof("max border is overcome up")
-	} else if rsi.Value <= float64(s.cfg.Strategies.RsiMinBorder) {
-		s.rsiPrev.maxBorderInProc = true
+	} else if rsi.Value <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(binSize).RsiMinBorder) {
+		s.rsiPrev.minBorderInProc = true
 		s.rsiPrev.maxBorderInProc = false
 		s.log.Infof("min border is overcome - down")
 	} else {

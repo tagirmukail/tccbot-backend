@@ -4,21 +4,23 @@ import (
 	"errors"
 	"time"
 
+	"github.com/markcheno/go-talib"
+
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-// fixme - расчет не совпадает с показателями биржи, необходимо пересчитать
 func (s *Strategies) processMACDStrategy(binSize string) error {
 	bin, err := models.ToBinSize(binSize)
 	if err != nil {
 		return err
 	}
 
-	fromTime, err := utils.FromTime(time.Now().UTC(), binSize, s.cfg.Strategies.MacdSlowCount)
+	count := s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount + s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount
+
+	fromTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
 	if err != nil {
 		return err
 	}
@@ -26,7 +28,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
 		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
-		Count:     int32(s.cfg.Strategies.MacdSlowCount),
+		Count:     int32(count),
 		StartTime: fromTime.Format(bitmex.TradeTimeFormat),
 	})
 	if err != nil {
@@ -48,19 +50,16 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 		return err
 	}
 
-	macdLastTsBySigCount := timestamps[len(timestamps)-s.cfg.Strategies.MacdSigCount:]
-
-	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.MACD}, []models.BinSize{bin}, macdLastTsBySigCount)
-	if err != nil {
-		return err
-	}
-	fastValues := closes[len(closes)-s.cfg.Strategies.MacdFastCount:]
-
-	macd := s.tradeCalc.CalculateMACD(fastValues, closes, s.fetchMacdVals(signals), trademath.EMAIndication)
+	macd := s.tradeCalc.CalcMACD(
+		closes,
+		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount, talib.EMA,
+		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount, talib.EMA,
+		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount, talib.WMA,
+	)
 	signal := models.Signal{
-		MACDFast:           s.cfg.Strategies.MacdFastCount,
-		MACDSlow:           s.cfg.Strategies.MacdSlowCount,
-		MACDSig:            s.cfg.Strategies.MacdSigCount,
+		MACDFast:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount,
+		MACDSlow:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount,
+		MACDSig:            s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount,
 		BinSize:            bin,
 		Timestamp:          lastCandleTs,
 		SignalType:         models.MACD,
@@ -72,8 +71,6 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 	if err != nil {
 		return err
 	}
-
-	signals = append(signals, &signal)
 
 	macdDiverg, err := s.processMACDSignals(bin, timestamps, candles)
 	if err != nil {

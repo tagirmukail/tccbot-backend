@@ -33,6 +33,7 @@ type WS struct {
 	timeout      int // in second
 
 	theme    []types.Theme
+	symbol   types.Symbol
 	messages chan *BitmexData
 }
 
@@ -43,6 +44,7 @@ func NewWS(
 	timeout int,
 	retrySec uint32,
 	theme []types.Theme,
+	symbol types.Symbol,
 ) *WS {
 	wsr := &WS{
 		log: log,
@@ -56,6 +58,7 @@ func NewWS(
 		pingInterval: ping,
 		timeout:      timeout,
 		theme:        theme,
+		symbol:       symbol,
 		messages:     make(chan *BitmexData),
 	}
 	wsr.ws.SubscribeHandler = wsr.subscribeHandler
@@ -171,7 +174,7 @@ func (r *WS) subscribeHandler() error {
 
 	var themes []types.Theme
 	for _, theme := range r.theme {
-		themes = append(themes, types.NewTemeWithPair(theme, types.XBTUSD))
+		themes = append(themes, types.NewTemeWithPair(theme, r.symbol))
 	}
 	subsMsg := types.NewSubscribeMsg(
 		types.SubscribeAct,

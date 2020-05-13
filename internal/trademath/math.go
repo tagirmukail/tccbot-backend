@@ -2,6 +2,8 @@ package trademath
 
 import (
 	"math"
+
+	"github.com/markcheno/go-talib"
 )
 
 type MAIndication uint16
@@ -35,8 +37,25 @@ type RSI struct {
 
 type Calc struct{}
 
+func (c *Calc) CalcMACD(
+	values []float64,
+	inFastPeriod int, inFastMAType talib.MaType,
+	inSlowPeriod int, inSlowMAType talib.MaType,
+	inSignalPeriod int, inSignalMAType talib.MaType,
+) MACD {
+	macd, macdSig, macdHist := talib.MacdExt(values, inFastPeriod, inFastMAType, inSlowPeriod, inSlowMAType, inSignalPeriod, inSignalMAType)
+	//macd, macdSig, macdHist := talib.Macd(values, inFastPeriod, inSlowPeriod, inSignalPeriod)
+
+	return MACD{
+		HistogramValue: RoundFloat(macdHist[len(macdHist)-1], 3),
+		Value:          RoundFloat(macd[len(macd)-1], 3),
+		Sig:            RoundFloat(macdSig[len(macdSig)-1], 3),
+	}
+}
+
 // CalculateMACD - calculate macd, indication - use only EMA or WMA.
 // recommendation: count for values: fast=12, slow=26, prevMACDValues=8
+// Deprecated
 func (c *Calc) CalculateMACD(
 	fastValues []float64, slowValues []float64, beforeMACDValues []float64, indication MAIndication,
 ) MACD {
@@ -70,8 +89,14 @@ func (c *Calc) CalculateMACD(
 	return macd
 }
 
+func (c *Calc) CalcRSI(values []float64, intTimePeriod int) RSI {
+	rsi := talib.Rsi(values, intTimePeriod)
+	return RSI{Value: RoundFloat(rsi[len(rsi)-1], 4)}
+}
+
 // CalculateRSI - calculate rsi by values and ma
 // recommendation: count values = 14, and indication - WMA
+// Deprecated
 func (c *Calc) CalculateRSI(values []float64, indication MAIndication) RSI {
 	var (
 		rsi        RSI
@@ -118,6 +143,7 @@ func (c *Calc) CalculateRSI(values []float64, indication MAIndication) RSI {
 	return rsi
 }
 
+// Deprecated
 func (c *Calc) CalculateSignals(values []float64) Singals {
 	tl, ml, bl := c.BolingerBandCalc(values)
 	return Singals{
@@ -132,7 +158,26 @@ func (c *Calc) CalculateSignals(values []float64) Singals {
 	}
 }
 
+func (c *Calc) CalcSignals(values []float64, maType talib.MaType) Singals {
+	tl, ml, bl := talib.BBands(values, len(values), 2, 2, maType)
+	sma := talib.Sma(values, len(values))
+	ema := talib.Ema(values, len(values))
+	wma := talib.Wma(values, len(values))
+	return Singals{
+		SMA: RoundFloat(sma[len(sma)-1], 4),
+		WMA: RoundFloat(wma[len(wma)-1], 4),
+		EMA: RoundFloat(ema[len(ema)-1], 4),
+		BB: struct {
+			TL float64
+			ML float64
+			BL float64
+		}{RoundFloat(tl[len(tl)-1], 4), RoundFloat(ml[len(ml)-1], 4), RoundFloat(bl[len(bl)-1], 4)},
+	}
+}
+
+// Deprecated
 func (c *Calc) BolingerBandCalc(values []float64) (tl, ml, bl float64) {
+
 	var (
 		sma       float64 // as middle line (ml)
 		sum       float64
@@ -158,6 +203,7 @@ func (c *Calc) BolingerBandCalc(values []float64) (tl, ml, bl float64) {
 	return tl, ml, bl
 }
 
+// Deprecated
 func (c *Calc) EMACalc(values []float64) float64 {
 	var ema float64
 	var smoothing float64 = 2
@@ -180,6 +226,7 @@ func (c *Calc) EMACalc(values []float64) float64 {
 	return RoundFloat(ema, 4)
 }
 
+// Deprecated
 func (c *Calc) SMACalc(values []float64) float64 {
 	var sum float64
 	for _, value := range values {
@@ -188,6 +235,7 @@ func (c *Calc) SMACalc(values []float64) float64 {
 	return RoundFloat(sum/float64(len(values)), 4)
 }
 
+// Deprecated
 func (c *Calc) WMACalc(values []float64) float64 {
 	var (
 		nom   float64

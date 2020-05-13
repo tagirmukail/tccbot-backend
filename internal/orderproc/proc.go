@@ -32,10 +32,10 @@ type OrderProcessor struct {
 	cfg        *config.GlobalConfig
 }
 
-func New(tickPeriodSec uint32, api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger) *OrderProcessor {
+func New(api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger) *OrderProcessor {
 	rand.Seed(time.Now().UnixNano())
 	return &OrderProcessor{
-		tickPeriod: time.Duration(tickPeriodSec) * time.Second,
+		tickPeriod: time.Duration(cfg.OrdProcPeriodSec) * time.Second,
 		api:        api,
 		cfg:        cfg,
 		log:        log,

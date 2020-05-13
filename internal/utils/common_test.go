@@ -101,7 +101,7 @@ func TestRandomRange(t *testing.T) {
 			name: "ok",
 			args: args{
 				min: 2.5,
-				max: 0,
+				max: 16,
 			},
 			want: 0,
 		},
