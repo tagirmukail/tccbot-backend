@@ -59,14 +59,47 @@ func (o *OrderProcessor) Start(wg *sync.WaitGroup) {
 			if err != nil {
 				o.log.Warnf("procActiveOrders failed: %v", err)
 			}
+			err = o.processPosition()
+			if err != nil {
+				o.log.Warnf("processPosition failed: %v", err)
+			}
 		}
 	}
 
 }
 
+func (o *OrderProcessor) processPosition() error {
+	o.log.Info("\n===============================\nstart process position")
+	defer o.log.Info("finish process position\n===============================\n")
+
+	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
+		Filter: fmt.Sprintf(`{"symbol": "%s"}`, o.cfg.ExchangesSettings.Bitmex.Symbol),
+	})
+	if err != nil {
+		return err
+	}
+	for _, position := range positions {
+		if trademath.ConvertToBTC(position.UnrealisedPnl) >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
+			if position.OpeningQty > 0 {
+				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true)
+				if err != nil {
+					return err
+				}
+			} else if position.OpeningQty < 0 {
+				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func (o *OrderProcessor) procActiveOrders() error {
-	o.log.Infof("start process active orders")
-	defer o.log.Infof("finish process active orders")
+	o.log.Infof("\n===============================\nstart process active orders")
+	defer o.log.Infof("finish process active orders\n===============================\n")
 
 	filter := fmt.Sprintf(`{"ordStatus":"%s"}`, types.OrdNew)
 	orders, err := o.api.GetBitmex().GetOrders(&bitmex.OrdersRequest{

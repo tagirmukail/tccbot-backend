@@ -9,7 +9,8 @@ exchanges_settings:
     order_type: Limit # Market, Limit, Stop, StopLimit, StopMarket
     currency: XBt
     symbol: XBTUSD
-    max_amount: 120
+    max_amount: 120 # max qty for creating order
+    close_position_min_btc: 0.0004 # if unrealized pnl great than this value, place order by position
 
   binance:
     test: true

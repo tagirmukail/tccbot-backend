@@ -111,15 +111,16 @@ type ExchangeSettings struct {
 }
 
 type ApiSettings struct {
-	Test       bool
-	PingSec    int
-	TimeoutSec int
-	RetrySec   int
-	BufferSize int
-	Currency   string
-	Symbol     string
-	OrderType  types.OrderType
-	MaxAmount  float64
+	Test                bool
+	PingSec             int
+	TimeoutSec          int
+	RetrySec            int
+	BufferSize          int
+	Currency            string
+	Symbol              string
+	OrderType           types.OrderType
+	MaxAmount           float64
+	ClosePositionMinBTC float64
 }
 
 type BitmexCfg struct {
@@ -180,27 +181,29 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	if len(bitmexSettings) == 0 {
 		// default
 		bitmex = ApiSettings{
-			Test:       true,
-			PingSec:    20,
-			TimeoutSec: 30,
-			RetrySec:   5,
-			BufferSize: 10,
-			Currency:   "XBt",
-			Symbol:     "XBTUSD",
-			OrderType:  types.Limit,
-			MaxAmount:  130,
+			Test:                true,
+			PingSec:             20,
+			TimeoutSec:          30,
+			RetrySec:            5,
+			BufferSize:          10,
+			Currency:            "XBt",
+			Symbol:              "XBTUSD",
+			OrderType:           types.Limit,
+			MaxAmount:           130,
+			ClosePositionMinBTC: 0.0005,
 		}
 	} else {
 		bitmex = ApiSettings{
-			Test:       viper.GetBool("exchanges_settings.bitmex.test"),
-			PingSec:    viper.GetInt("exchanges_settings.bitmex.ping_sec"),
-			TimeoutSec: viper.GetInt("exchanges_settings.bitmex.timeout_sec"),
-			RetrySec:   viper.GetInt("exchanges_settings.bitmex.retry_sec"),
-			BufferSize: viper.GetInt("exchanges_settings.bitmex.buffer_size"),
-			Symbol:     viper.GetString("exchanges_settings.bitmex.symbol"),
-			Currency:   viper.GetString("exchanges_settings.bitmex.currency"),
-			OrderType:  types.OrderType(viper.GetString("exchanges_settings.bitmex.order_type")),
-			MaxAmount:  viper.GetFloat64("exchanges_settings.bitmex.max_amount"),
+			Test:                viper.GetBool("exchanges_settings.bitmex.test"),
+			PingSec:             viper.GetInt("exchanges_settings.bitmex.ping_sec"),
+			TimeoutSec:          viper.GetInt("exchanges_settings.bitmex.timeout_sec"),
+			RetrySec:            viper.GetInt("exchanges_settings.bitmex.retry_sec"),
+			BufferSize:          viper.GetInt("exchanges_settings.bitmex.buffer_size"),
+			Symbol:              viper.GetString("exchanges_settings.bitmex.symbol"),
+			Currency:            viper.GetString("exchanges_settings.bitmex.currency"),
+			OrderType:           types.OrderType(viper.GetString("exchanges_settings.bitmex.order_type")),
+			MaxAmount:           viper.GetFloat64("exchanges_settings.bitmex.max_amount"),
+			ClosePositionMinBTC: viper.GetFloat64("exchanges_settings.bitmex.close_position_min_btc"),
 		}
 	}
 	fmt.Println("--------------------------------------------")
