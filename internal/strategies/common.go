@@ -16,7 +16,7 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const limitMinOnOrderQty = 2.5
+const limitMinOnOrderQty = 100
 
 func (s *Strategies) fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	var result []float64
@@ -112,7 +112,7 @@ func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalT
 
 	amount := utils.RandomRange(limitMinOnOrderQty, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
 
-	ord, err := s.orderProc.PlaceOrder(types.Bitmex, signalType, side, amount, 0, false)
+	ord, err := s.orderProc.PlaceOrder(types.Bitmex, side, amount, false)
 	if err != nil {
 		s.log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err

@@ -13,14 +13,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
-
 	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
+
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/crypto"
 )
-
-// TODO добавить синхронизацию
 
 type Bitmex struct {
 	key              string
@@ -238,6 +236,12 @@ func (b *Bitmex) do(item *Request) error {
 
 	if resp == nil {
 		return nil
+	}
+
+	if b.verbose {
+		for k, v := range resp.Header {
+			b.logger.Infof("response header[%s]:[%v]", k, v[0])
+		}
 	}
 
 	content, err := ioutil.ReadAll(resp.Body)

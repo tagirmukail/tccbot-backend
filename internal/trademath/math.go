@@ -158,6 +158,14 @@ func (c *Calc) CalculateSignals(values []float64) Singals {
 	}
 }
 
+func (c *Calc) CalcBB(values []float64, maType talib.MaType) (tlV, mlV, blV float64) {
+	tl, ml, bl := talib.BBands(values, len(values), 2, 2, maType)
+	if len(tl) == 0 || len(ml) == 0 || len(bl) == 0 {
+		return 0, 0, 0
+	}
+	return RoundFloat(tl[len(tl)-1], 4), RoundFloat(ml[len(ml)-1], 4), RoundFloat(bl[len(bl)-1], 4)
+}
+
 func (c *Calc) CalcSignals(values []float64, maType talib.MaType) Singals {
 	tl, ml, bl := talib.BBands(values, len(values), 2, 2, maType)
 	sma := talib.Sma(values, len(values))

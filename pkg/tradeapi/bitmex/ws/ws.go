@@ -5,18 +5,24 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/recws-org/recws"
 	"github.com/sirupsen/logrus"
+
 	"github.com/tagirmukail/tccbot-backend/internal/types"
+	"github.com/tagirmukail/tccbot-backend/pkg/recws"
 )
 
 const (
-	timeReadSleep = 3 * time.Second
+	timeReadSleep    = 3 * time.Second
+	handshakeTimeout = 5 * time.Second
+
+	bitmexWSUrl        = "wss://www.bitmex.com/realtime"
+	bitmexTestnetWSUrl = "wss://testnet.bitmex.com/realtime"
 )
 
 type Receiver interface {
@@ -25,9 +31,8 @@ type Receiver interface {
 type WS struct {
 	log *logrus.Logger
 
-	ws       *recws.RecConn
-	isWorked bool
-	connUrl  url.URL
+	ws      *recws.RecConn
+	connUrl string
 
 	pingInterval int // ping interval in second
 	timeout      int // in second
@@ -39,13 +44,20 @@ type WS struct {
 
 func NewWS(
 	log *logrus.Logger,
-	wsUrl url.URL,
+	test bool,
 	ping int,
 	timeout int,
 	retrySec uint32,
 	theme []types.Theme,
 	symbol types.Symbol,
 ) *WS {
+	var bitmexUrl string
+	if test {
+		bitmexUrl = bitmexTestnetWSUrl
+	} else {
+		bitmexUrl = bitmexWSUrl
+	}
+
 	wsr := &WS{
 		log: log,
 		ws: &recws.RecConn{
@@ -53,14 +65,16 @@ func NewWS(
 			RecIntvlMax:      time.Duration(retrySec) * time.Second,
 			KeepAliveTimeout: time.Duration(timeout) * time.Second,
 			NonVerbose:       true,
+			HandshakeTimeout: handshakeTimeout,
 		},
-		connUrl:      wsUrl,
+		connUrl:      bitmexUrl + "?" + buildSubscribeParams(symbol, theme),
 		pingInterval: ping,
 		timeout:      timeout,
 		theme:        theme,
 		symbol:       symbol,
 		messages:     make(chan *BitmexData),
 	}
+
 	wsr.ws.SubscribeHandler = wsr.subscribeHandler
 
 	return wsr
@@ -71,28 +85,32 @@ func (r *WS) GetMessages() chan *BitmexData {
 }
 
 // Start start reads bitmex messages
-func (r *WS) Start() {
+func (r *WS) Start(wgForeign *sync.WaitGroup) {
+	defer wgForeign.Done()
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
-	r.ws.Dial(r.connUrl.String(), nil)
+	r.ws.Dial(r.connUrl, nil)
 	err := r.ws.GetDialError()
 	if err != nil {
-		r.log.Fatalf("binance not connected, error: %v", err)
+		r.log.Fatalf("bitmex not connected, error: %v", err)
 	}
 	defer r.ws.Close()
 
-	r.log.Infof("connected to %s", r.connUrl.String())
+	r.log.Infof("connected to %s", r.connUrl)
 
-	go r.read()
-
-	r.isWorked = true
-
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go r.read(wg)
+	wg.Add(1)
+	go r.ping(wg)
+	wg.Wait()
 	<-done
 }
 
 // read reads messages from ws connection to bitmex and sends this to messages chanel
-func (r *WS) read() {
+func (r *WS) read(wg *sync.WaitGroup) {
+	defer wg.Done()
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
@@ -101,7 +119,8 @@ func (r *WS) read() {
 	for {
 		mType, data, err := r.ws.ReadMessage()
 		if err != nil {
-			if strings.Contains(err.Error(), "use of closed network connection") {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				r.log.Infof("read messages from bitmex ws stopped")
 				return
 			}
 			r.log.Warnf("bitmex WS.read() read message from websocket error: %v", err)
@@ -111,23 +130,9 @@ func (r *WS) read() {
 
 		switch mType {
 		case websocket.CloseMessage:
-			r.log.Infof("WS.read() %s websocket bitmex closed", r.connUrl.String())
+			r.log.Infof("WS.read() %s websocket bitmex closed", r.connUrl)
 			close(r.messages)
 			return
-		case websocket.PingMessage:
-			err = r.ws.WriteMessage(websocket.PongMessage, []byte("pong"))
-			if err != nil {
-				r.log.Infof("WS.read() %s websocket send pong message error: %v", r.connUrl.String(), err)
-			}
-			r.log.Infof("send pong message")
-			continue
-		case websocket.PongMessage:
-			err = r.ws.WriteMessage(websocket.PingMessage, []byte("ping"))
-			if err != nil {
-				r.log.Infof("WS.read() %s websocket send pong message error: %v", r.connUrl.String(), err)
-			}
-			r.log.Infof("send ping message")
-			continue
 		case websocket.TextMessage:
 			break
 		default:
@@ -136,7 +141,7 @@ func (r *WS) read() {
 		}
 
 		if string(data) == "pong" {
-			r.log.Infoln("bitmex ping message received")
+			r.log.Infoln("bitmex pong message received")
 			continue
 		}
 
@@ -186,10 +191,6 @@ func (r *WS) subscribeHandler() error {
 		return err
 	}
 
-	if !r.ws.IsConnected() {
-		r.ws.Dial(r.connUrl.String(), nil)
-	}
-
 	err = r.ws.WriteMessage(websocket.TextMessage, data)
 	if err != nil {
 		r.log.Errorf("WS.Start() websocket write msg error: %v", err)
@@ -200,4 +201,46 @@ func (r *WS) subscribeHandler() error {
 	r.log.Debugf("bitmex - send subscribe message: %s", string(data))
 
 	return nil
+}
+
+func (r *WS) ping(wg *sync.WaitGroup) {
+	defer wg.Done()
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
+
+	tick := time.NewTicker(time.Duration(r.pingInterval) * time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-done:
+			err := r.ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			if err != nil {
+				r.log.Errorf("write close ws failed", "error", err)
+			}
+			return
+		case <-tick.C:
+			r.log.Debug("send ping message bitmex ws")
+			err := r.ws.WriteMessage(websocket.TextMessage, []byte("ping"))
+			if err != nil {
+				r.log.Errorf("ping message send failed: %v", err)
+				if websocket.IsCloseError(err) {
+					r.log.Fatal(err)
+				}
+			}
+		default:
+			continue
+		}
+	}
+
+}
+
+func buildSubscribeParams(symbol types.Symbol, themes []types.Theme) string {
+	params := url.Values{}
+	var subsParams []string
+	for _, th := range themes {
+		subsParams = append(subsParams, string(types.NewTemeWithPair(th, symbol)))
+	}
+	params.Add("subscribe", strings.Join(subsParams, ","))
+	return params.Encode()
 }

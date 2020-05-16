@@ -9,7 +9,7 @@ exchanges_settings:
     order_type: Limit # Market, Limit, Stop, StopLimit, StopMarket
     currency: XBt
     symbol: XBTUSD
-    max_amount: 16
+    max_amount: 120
 
   binance:
     test: true
@@ -34,22 +34,9 @@ exchanges_access:
   bitmex:
     key: key
     secret: secret
-
-strategies:
-  enable_bb: true # enable bolinger band strategy
-  enable_macd: true # enable macd strategy
-  enable_rsi: true # enable rsi strategy
-  bin_sizes: ["5m","1h"] # 5m,1h,1d
-  retry_process_count: 5
-  bb_last_candles_count: 4
-  get_candles_count: 30
-  rsi_count: 14
-  rsi_min_border: 30
-  rsi_max_border: 70
-  rsi_trade_coef: 0.0004
-  macd_fast_count: 12
-  macd_slow_count: 26
-  macd_sig_count: 9
+    testnet:
+      key: key
+      secret: secret
 
 strategies_g:
   1m:
@@ -68,9 +55,10 @@ strategies_g:
     macd_slow_count: 26
     macd_sig_count: 9
   5m:
-    enable_bb: true # enable bolinger band strategy
-    enable_macd: true # enable macd strategy
-    enable_rsi: true # enable rsi strategy
+    enable_bb: false # enable bolinger band strategy
+    enable_macd: false # enable macd strategy
+    enable_rsi: false # enable rsi strategy
+    enable_rsi_bb: true
     bin_sizes: ["5m","1h"] # 5m,1h,1d
     retry_process_count: 5
     bb_last_candles_count: 4

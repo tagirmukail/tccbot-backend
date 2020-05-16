@@ -2,12 +2,13 @@ package main
 
 import (
 	"flag"
-	"net/url"
 	"os"
 	"os/signal"
 	"runtime/pprof"
 	"sync"
 	"syscall"
+
+	"github.com/tagirmukail/tccbot-backend/internal/strategies/strategy"
 
 	"github.com/sirupsen/logrus"
 
@@ -86,23 +87,18 @@ func main() {
 		return
 	}
 
-	var bitmexUrl url.URL
-	if testMode {
-		bitmexUrl = url.URL{Scheme: "wss", Host: "testnet.bitmex.com", Path: "realtime"}
-	} else {
-		bitmexUrl = url.URL{Scheme: "wss", Host: "www.bitmex.com", Path: "realtime"}
-	}
-
 	var themes = cfg.GlobStrategies.GetThemes()
 
 	tradeApi := tradeapi.NewTradeApi(
 		cfg.Accesses.Bitmex.Key,
 		cfg.Accesses.Bitmex.Secret,
+		cfg.Accesses.Bitmex.Testnet.Key,
+		cfg.Accesses.Bitmex.Testnet.Secret,
 		log,
 		testMode,
 		ws.NewWS(
 			log,
-			bitmexUrl,
+			testMode,
 			cfg.ExchangesSettings.Bitmex.PingSec,
 			cfg.ExchangesSettings.Bitmex.TimeoutSec,
 			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
@@ -117,7 +113,9 @@ func main() {
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	wg := &sync.WaitGroup{}
-	strategiesType := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals)
+	strategiesType := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
+		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, log),
+	)
 	strategiesType.Start()
 	<-done
 

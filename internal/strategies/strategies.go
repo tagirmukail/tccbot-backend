@@ -1,20 +1,21 @@
 package strategies
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 
-	"github.com/tagirmukail/tccbot-backend/internal/types"
-
-	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/db"
+	"github.com/tagirmukail/tccbot-backend/internal/db/models"
+	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+	"github.com/tagirmukail/tccbot-backend/internal/strategies/strategy"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
+	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 )
 
@@ -35,6 +36,8 @@ type Strategies struct {
 		restart5m bool
 		restart1h bool
 	}
+
+	bbRsi strategy.Strategy
 }
 
 func New(
@@ -45,6 +48,7 @@ func New(
 	db db.DBManager,
 	log *logrus.Logger,
 	initSignals bool,
+	bbStrategy strategy.Strategy,
 ) *Strategies {
 	return &Strategies{
 		wgRunner:    wgRunner,
@@ -55,6 +59,7 @@ func New(
 		log:         log,
 		tradeCalc:   trademath.Calc{},
 		initSignals: initSignals,
+		bbRsi:       bbStrategy,
 	}
 }
 
@@ -75,10 +80,12 @@ func (s *Strategies) Start() {
 func (s *Strategies) start() {
 	defer s.wgRunner.Done()
 
-	go s.tradeApi.GetBitmex().GetWS().Start()
+	s.wgRunner.Add(1)
+	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
+
 	s.log.Infof("process messages from bitmex started")
 	for {
 		select {
@@ -87,6 +94,7 @@ func (s *Strategies) start() {
 			return
 		case data := <-s.tradeApi.GetBitmex().GetWS().GetMessages():
 			if len(data.Data) == 0 {
+				s.log.Debug("empty data from ws")
 				continue
 			}
 			switch data.Table {
@@ -107,6 +115,11 @@ func (s *Strategies) start() {
 }
 
 func (s *Strategies) processStrategies(binSize string) {
+	bin, err := models.ToBinSize(binSize)
+	if err != nil {
+		s.log.Warnf("to bin size error: %v", err)
+		return
+	}
 	strategiesConfig := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
 	if strategiesConfig == nil {
 		s.log.Warnf("strategies not installed for bin_size:%s", binSize)
@@ -120,22 +133,17 @@ func (s *Strategies) processStrategies(binSize string) {
 	s.log.Infof("\n-------------------------------------\nstart strategies - bin size: %s", binSize)
 	defer s.log.Infof("finished strategies - bin size: %s\n-------------------------------------", binSize)
 
-	if strategiesConfig.EnableBolingerBand {
-		err := s.processBBStrategy(binSize, int32(strategiesConfig.GetCandlesCount))
-		if err != nil {
-			s.log.Errorf("processBBStrategy error: %v", err)
-		}
+	var currentStrategy strategy.Strategy
+
+	if strategiesConfig.EnableRSIBB {
+		currentStrategy = s.bbRsi
 	}
-	if strategiesConfig.EnableMACD {
-		err := s.processMACDStrategy(binSize)
+	// todo add macd with rsi
+
+	if currentStrategy != nil {
+		err = currentStrategy.Execute(context.Background(), bin)
 		if err != nil {
-			s.log.Errorf("processMACDStrategy error: %v", err)
-		}
-	}
-	if strategiesConfig.EnableRSI {
-		err := s.processRsiStrategy(binSize)
-		if err != nil {
-			s.log.Errorf("processRsiStrategy error: %v", err)
+			s.log.Errorf("execute strategy failed: %v", err)
 		}
 	}
 }

@@ -11,8 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 
 	"github.com/sirupsen/logrus"
@@ -22,8 +20,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
-
-// Следить за ордерами на бирже и перевыставлять при необходимости или отменять
 
 type OrderProcessor struct {
 	tickPeriod time.Duration
@@ -114,11 +110,9 @@ func (o *OrderProcessor) procActiveOrders() error {
 
 func (o *OrderProcessor) PlaceOrder(
 	exchange types.Exchange,
-	signalType models.SignalType,
 	side types.Side,
 	amount float64,
-	stopPx float64,
-	close bool,
+	passive bool,
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
@@ -128,17 +122,9 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 		var price float64
 		if side == types.SideSell {
-			//if signalType == models.RSI {
-			//	price = inst.AskPrice
-			//} else {
 			price = inst.AskPrice
-			//}
 		} else {
-			//if signalType == models.RSI {
-			//	price = inst.BidPrice
-			//} else {
 			price = inst.BidPrice
-			//}
 		}
 
 		params := &bitmex.OrderNewParams{
@@ -148,8 +134,8 @@ func (o *OrderProcessor) PlaceOrder(
 			OrderQty:  math.Round(amount),
 			Price:     price,
 		}
-		if close {
-			params.ExecInst = "Close"
+		if passive {
+			params.ExecInst = "ParticipateDoNotInitiate"
 		}
 		o.log.Infof("create order params: %#v", params)
 		order, err := o.api.GetBitmex().CreateOrder(params)

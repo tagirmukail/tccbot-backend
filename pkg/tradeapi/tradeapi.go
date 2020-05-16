@@ -48,16 +48,26 @@ type TradeApi struct {
 }
 
 func NewTradeApi(
-	bitmexKey string,
-	bitmexSecret string,
+	bitmexKey,
+	bitmexSecret,
+	bitmexTestNetKey,
+	bitmexTestNetSecret string,
 	log *logrus.Logger,
 	test bool,
 	ws *ws.WS,
 ) *TradeApi {
+	var bkey, bsecret string
+	if test {
+		bkey = bitmexTestNetKey
+		bsecret = bitmexTestNetSecret
+	} else {
+		bkey = bitmexKey
+		bsecret = bitmexSecret
+	}
 	tapi := &TradeApi{
 		bitmex: bitmex.New(
-			bitmexKey,
-			bitmexSecret,
+			bkey,
+			bsecret,
 			true,
 			defaultRetryCount,
 			defaultIdleTimeout,

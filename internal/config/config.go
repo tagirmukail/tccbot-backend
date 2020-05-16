@@ -83,9 +83,8 @@ func (s *StrategiesGlobConfig) GetBinSizes() []string {
 }
 
 type StrategiesConfig struct {
-	EnableBolingerBand bool
 	EnableMACD         bool
-	EnableRSI          bool
+	EnableRSIBB        bool
 	RetryProcessCount  int
 	GetCandlesCount    int
 	BBLastCandlesCount int
@@ -99,7 +98,7 @@ type StrategiesConfig struct {
 }
 
 func (strategies *StrategiesConfig) AnyStrategyEnabled() bool {
-	return strategies.EnableBolingerBand || strategies.EnableRSI || strategies.EnableMACD
+	return strategies.EnableRSIBB
 }
 
 type ExchangesSettings struct {
@@ -160,8 +159,12 @@ type ExchangesAccess struct {
 }
 
 type Access struct {
-	Key    string `json:"key"`
-	Secret string `json:"secret"`
+	Key     string `json:"key"`
+	Secret  string `json:"secret"`
+	Testnet struct {
+		Key    string
+		Secret string
+	}
 }
 
 func ParseConfig(cfgFile string) (*GlobalConfig, error) {
@@ -185,12 +188,12 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			Currency:   "XBt",
 			Symbol:     "XBTUSD",
 			OrderType:  types.Limit,
-			MaxAmount:  10,
+			MaxAmount:  130,
 		}
 	} else {
 		bitmex = ApiSettings{
 			Test:       viper.GetBool("exchanges_settings.bitmex.test"),
-			PingSec:    viper.GetInt("exchanges_settings.bitmex..ping_sec"),
+			PingSec:    viper.GetInt("exchanges_settings.bitmex.ping_sec"),
 			TimeoutSec: viper.GetInt("exchanges_settings.bitmex.timeout_sec"),
 			RetrySec:   viper.GetInt("exchanges_settings.bitmex.retry_sec"),
 			BufferSize: viper.GetInt("exchanges_settings.bitmex.buffer_size"),
@@ -209,7 +212,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 	if len(globStrateg) == 0 {
 		// default
 		strategies := &StrategiesConfig{}
-		strategies.EnableBolingerBand = true
+		strategies.EnableRSIBB = true
 		strategies.RetryProcessCount = 5
 		strategies.GetCandlesCount = 20
 		strategies.BBLastCandlesCount = 4
@@ -229,9 +232,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			switch k {
 			case "1m":
 				var strategies = StrategiesConfig{
-					EnableBolingerBand: viper.GetBool("strategies_g.1m.enable_bb"),
 					EnableMACD:         viper.GetBool("strategies_g.1m.enable_macd"),
-					EnableRSI:          viper.GetBool("strategies_g.1m.enable_rsi"),
+					EnableRSIBB:        viper.GetBool("strategies_g.1m.enable_rsi_bb"),
 					RetryProcessCount:  viper.GetInt("strategies_g.1m.retry_process_count"),
 					GetCandlesCount:    viper.GetInt("strategies_g.1m.get_candles_count"),
 					BBLastCandlesCount: viper.GetInt("strategies_g.1m.bb_last_candles_count"),
@@ -249,9 +251,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 				fmt.Println("--------------------------------------------")
 			case "5m":
 				var strategies = StrategiesConfig{
-					EnableBolingerBand: viper.GetBool("strategies_g.5m.enable_bb"),
 					EnableMACD:         viper.GetBool("strategies_g.5m.enable_macd"),
-					EnableRSI:          viper.GetBool("strategies_g.5m.enable_rsi"),
+					EnableRSIBB:        viper.GetBool("strategies_g.5m.enable_rsi_bb"),
 					RetryProcessCount:  viper.GetInt("strategies_g.5m.retry_process_count"),
 					GetCandlesCount:    viper.GetInt("strategies_g.5m.get_candles_count"),
 					BBLastCandlesCount: viper.GetInt("strategies_g.5m.bb_last_candles_count"),
@@ -269,9 +270,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 				fmt.Println("--------------------------------------------")
 			case "1h":
 				var strategies = StrategiesConfig{
-					EnableBolingerBand: viper.GetBool("strategies_g.1h.enable_bb"),
 					EnableMACD:         viper.GetBool("strategies_g.1h.enable_macd"),
-					EnableRSI:          viper.GetBool("strategies_g.1h.enable_rsi"),
+					EnableRSIBB:        viper.GetBool("strategies_g.1h.enable_rsi_bb"),
 					RetryProcessCount:  viper.GetInt("strategies_g.1h.retry_process_count"),
 					GetCandlesCount:    viper.GetInt("strategies_g.1h.get_candles_count"),
 					BBLastCandlesCount: viper.GetInt("strategies_g.1h.bb_last_candles_count"),
@@ -306,6 +306,13 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			Bitmex: Access{
 				Key:    viper.GetString("exchanges_access.bitmex.key"),
 				Secret: viper.GetString("exchanges_access.bitmex.secret"),
+				Testnet: struct {
+					Key    string
+					Secret string
+				}{
+					Key:    viper.GetString("exchanges_access.bitmex.testnet.key"),
+					Secret: viper.GetString("exchanges_access.bitmex.testnet.secret"),
+				},
 			},
 		},
 		DB: DB{
