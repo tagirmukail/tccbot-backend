@@ -8,6 +8,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
+
 	"github.com/tagirmukail/tccbot-backend/internal/strategies/strategy"
 
 	"github.com/sirupsen/logrus"
@@ -21,6 +23,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
 )
+
+const maxCandles = 100
 
 func main() {
 	var (
@@ -109,12 +113,17 @@ func main() {
 
 	ordProc := orderproc.New(tradeApi, cfg, log)
 
+	caches := candlecache.NewBinToCache(
+		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,
+	)
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	wg := &sync.WaitGroup{}
 	strategiesType := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
-		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, log),
+		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log),
+		caches,
 	)
 	strategiesType.Start()
 	<-done

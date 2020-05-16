@@ -7,6 +7,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
+
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
@@ -32,10 +34,7 @@ type Strategies struct {
 		minBorderInProc bool
 		maxBorderInProc bool
 	}
-	restarts struct {
-		restart5m bool
-		restart1h bool
-	}
+	candlesCaches candlecache.Caches
 
 	bbRsi strategy.Strategy
 }
@@ -49,26 +48,26 @@ func New(
 	log *logrus.Logger,
 	initSignals bool,
 	bbStrategy strategy.Strategy,
+	candlesCaches candlecache.Caches,
 ) *Strategies {
 	return &Strategies{
-		wgRunner:    wgRunner,
-		cfg:         cfg,
-		tradeApi:    tradeApi,
-		orderProc:   orderProc,
-		db:          db,
-		log:         log,
-		tradeCalc:   trademath.Calc{},
-		initSignals: initSignals,
-		bbRsi:       bbStrategy,
+		wgRunner:      wgRunner,
+		cfg:           cfg,
+		tradeApi:      tradeApi,
+		orderProc:     orderProc,
+		db:            db,
+		log:           log,
+		tradeCalc:     trademath.Calc{},
+		initSignals:   initSignals,
+		bbRsi:         bbStrategy,
+		candlesCaches: candlesCaches,
 	}
 }
 
 func (s *Strategies) Start() {
-	if s.initSignals { // is not needed
-		err := s.SignalsInit()
-		if err != nil {
-			s.log.Fatalf("SignalsInit failed: %v", err)
-		}
+	err := s.SignalsInit()
+	if err != nil {
+		s.log.Fatalf("SignalsInit failed: %v", err)
 	}
 	s.wgRunner.Add(1)
 	go s.start()
@@ -99,12 +98,44 @@ func (s *Strategies) start() {
 			}
 			switch data.Table {
 			case string(types.TradeBin1m):
+				if len(data.Data) != 0 {
+					for _, candle := range data.Data {
+						err := s.candlesCaches.GetCache(models.Bin1m).Store(candle)
+						if err != nil {
+							s.log.Warnf("store candle in cache failed: %v", err)
+						}
+					}
+				}
 				s.processStrategies("1m")
 			case string(types.TradeBin5m):
+				if len(data.Data) != 0 {
+					for _, candle := range data.Data {
+						err := s.candlesCaches.GetCache(models.Bin5m).Store(candle)
+						if err != nil {
+							s.log.Warnf("store candle in cache failed: %v", err)
+						}
+					}
+				}
 				s.processStrategies("5m")
 			case string(types.TradeBin1h):
+				if len(data.Data) != 0 {
+					for _, candle := range data.Data {
+						err := s.candlesCaches.GetCache(models.Bin1h).Store(candle)
+						if err != nil {
+							s.log.Warnf("store candle in cache failed: %v", err)
+						}
+					}
+				}
 				s.processStrategies("1h")
 			case string(types.TradeBin1d):
+				if len(data.Data) != 0 {
+					for _, candle := range data.Data {
+						err := s.candlesCaches.GetCache(models.Bin1d).Store(candle)
+						if err != nil {
+							s.log.Warnf("store candle in cache failed: %v", err)
+						}
+					}
+				}
 				s.processStrategies("1d")
 			default:
 				s.log.Warnf("processStrategies is not supported this trade bin: %v", data.Table)

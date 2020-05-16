@@ -8,6 +8,7 @@ import (
 	"github.com/markcheno/go-talib"
 	"github.com/sirupsen/logrus"
 
+	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
 	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/db"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
@@ -25,6 +26,7 @@ type BBRSIStrategy struct {
 	orderProc  *orderproc.OrderProcessor
 	log        *logrus.Logger
 	db         db.DBManager
+	caches     candlecache.Caches
 	bbInAction AcceptAction
 }
 
@@ -33,6 +35,7 @@ func NewBBRSIStrategy(
 	api tradeapi.Api,
 	orderProc *orderproc.OrderProcessor,
 	db db.DBManager,
+	caches candlecache.Caches,
 	log *logrus.Logger,
 ) *BBRSIStrategy {
 	return &BBRSIStrategy{
@@ -43,13 +46,14 @@ func NewBBRSIStrategy(
 		log:        log,
 		bbInAction: NotAccepted,
 		math:       trademath.Calc{},
+		caches:     caches,
 	}
 }
 
 func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	s.log.Infof("start execute bb rsi strategy")
 	defer s.log.Infof("finish execute bb rsi strategy")
-	candles, err := s.getCandles(size.String())
+	candles, err := s.getCandles(size)
 	if err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
@@ -34,29 +35,19 @@ func (s *BBRSIStrategy) fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	return result
 }
 
-func (s *BBRSIStrategy) getCandles(binSize string) ([]bitmex.TradeBuck, error) {
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
+func (s *BBRSIStrategy) getCandles(binSize models.BinSize) ([]bitmex.TradeBuck, error) {
+	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String())
 	var count int
 	if cfg.RsiCount > cfg.GetCandlesCount {
 		count = cfg.RsiCount * 2
 	} else {
 		count = cfg.GetCandlesCount * 2
 	}
-
-	startTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
+	startTime, err := utils.FromTime(time.Now().UTC(), binSize.String(), count)
 	if err != nil {
 		return nil, err
 	}
-	candles, err := s.api.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
-		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
-		BinSize:   binSize,
-		Count:     int32(count),
-		StartTime: startTime.Format(bitmex.TradeTimeFormat),
-	})
-	if err != nil {
-		return nil, err
-	}
-
+	candles := s.caches.GetCache(binSize).GetBucketed(startTime, time.Time{}, count)
 	return candles, nil
 }
 

@@ -48,6 +48,12 @@ func (s *Strategies) binProcess(binSize string) error {
 	if err != nil {
 		return err
 	}
+
+	cache := s.candlesCaches.GetCache(binType)
+	if cache != nil {
+		cache.StoreBatch(candles)
+	}
+
 	closes := s.fetchCloses(candles)
 	if len(closes) < s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount {
 		return errors.New("candles less than macd slow count")

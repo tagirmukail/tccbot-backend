@@ -15,6 +15,7 @@ import (
 
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/pkg/recws"
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws/data"
 )
 
 const (
@@ -39,7 +40,7 @@ type WS struct {
 
 	theme    []types.Theme
 	symbol   types.Symbol
-	messages chan *BitmexData
+	messages chan *data.BitmexData
 }
 
 func NewWS(
@@ -72,7 +73,7 @@ func NewWS(
 		timeout:      timeout,
 		theme:        theme,
 		symbol:       symbol,
-		messages:     make(chan *BitmexData),
+		messages:     make(chan *data.BitmexData),
 	}
 
 	wsr.ws.SubscribeHandler = wsr.subscribeHandler
@@ -80,7 +81,7 @@ func NewWS(
 	return wsr
 }
 
-func (r *WS) GetMessages() chan *BitmexData {
+func (r *WS) GetMessages() chan *data.BitmexData {
 	return r.messages
 }
 
@@ -117,7 +118,7 @@ func (r *WS) read(wg *sync.WaitGroup) {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 	r.log.Infof("WS.read read trades:%v from bitmex started", r.theme)
 	for {
-		mType, data, err := r.ws.ReadMessage()
+		mType, msg, err := r.ws.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 				r.log.Infof("read messages from bitmex ws stopped")
@@ -140,16 +141,16 @@ func (r *WS) read(wg *sync.WaitGroup) {
 			continue
 		}
 
-		if string(data) == "pong" {
+		if string(msg) == "pong" {
 			r.log.Infoln("bitmex pong message received")
 			continue
 		}
 
-		resp := &BitmexData{}
-		err = j.Unmarshal(data, resp)
+		resp := &data.BitmexData{}
+		err = j.Unmarshal(msg, resp)
 		if err != nil {
 			r.log.Warnf("bitmex WS.read() unmarshal websocket message error: %v", err)
-			r.log.Warnf("bitmex WS.read() unmarshal websocket message error - data: %v", string(data))
+			r.log.Warnf("bitmex WS.read() unmarshal websocket message error - data: %v", string(msg))
 			continue
 		}
 
