@@ -15,6 +15,7 @@ type GlobalConfig struct {
 	Accesses          ExchangesAccess
 	GlobStrategies    StrategiesGlobConfig
 	OrdProcPeriodSec  int
+	DBPath            string
 }
 
 type DB struct {
@@ -326,6 +327,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			Port:     viper.GetUint32("db.port"),
 			SSLMode:  viper.GetString("db.sslmode"),
 		},
+		DBPath:           viper.GetString("db_path"),
 		OrdProcPeriodSec: viper.GetInt("ord_proc_period_sec"),
 	}
 	fmt.Println("--------------------------------------------")

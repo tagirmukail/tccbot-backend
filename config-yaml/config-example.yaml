@@ -88,3 +88,4 @@ strategies_g:
     macd_sig_count: 9
 
 ord_proc_period_sec: 180
+db_path: .tccbot.db

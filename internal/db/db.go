@@ -1,8 +1,11 @@
 package db
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/golang-migrate/migrate/v4"
+
+	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/jmoiron/sqlx"
@@ -12,6 +15,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
+
+const defaultRetryCount = 5
 
 type DBManager interface {
 	Close() error
@@ -33,39 +38,38 @@ type DBManager interface {
 }
 
 type DB struct {
-	log *logrus.Logger
-	db  *sqlx.DB
+	log   *logrus.Logger
+	retry int
+	db    *sqlx.DB
 }
 
-func New(cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command Command) (*DB, error) {
+func NewDB(
+	cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command migrate_db.Command, step int,
+) (*DB, error) {
 	var err error
 	manager := &DB{
-		log: log,
+		log:   log,
+		retry: defaultRetryCount,
+	}
+	if cfg.DBPath == "" {
+		cfg.DBPath = ".tccbot_db"
 	}
 	if db == nil {
-		db, err = sqlx.Open(
-			"pgx",
-			fmt.Sprintf("dbname=%s user=%s password=%s host=%s port=%v sslmode=%s",
-				cfg.DB.DBName, cfg.DB.User, cfg.DB.Password, cfg.DB.Host, cfg.DB.Port, cfg.DB.SSLMode),
-		)
+		db, err = sqlx.Open("sqlite3", cfg.DB.DBName)
 		if err != nil {
 			return nil, err
 		}
 	}
-
 	manager.db = db
-
 	err = db.Ping()
 	if err != nil {
 		return nil, err
 	}
 
-	err = migration(cfg, log, command)
-	if err != nil {
+	err = migrate_db.Migrate(cfg.DBPath, manager.db.DB, command, step)
+	if err != nil && err != migrate.ErrNoChange {
 		return nil, err
 	}
-
-	log.Info("database initialized")
 
 	return manager, nil
 }

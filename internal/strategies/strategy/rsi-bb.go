@@ -62,11 +62,8 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	if err != nil {
 		return err
 	}
-	if acceptAction == NotAccepted {
-		return nil
-	}
 
-	acceptAction, err = s.processBB(candles, size)
+	acceptAction, err = s.processBB(acceptAction, candles, size)
 	if err != nil {
 		return err
 	}
@@ -134,7 +131,9 @@ func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSi
 	return NotAccepted, nil
 }
 
-func (s *BBRSIStrategy) processBB(candles []bitmex.TradeBuck, size models.BinSize) (AcceptAction, error) {
+func (s *BBRSIStrategy) processBB(
+	action AcceptAction, candles []bitmex.TradeBuck, size models.BinSize,
+) (AcceptAction, error) {
 	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
 		return NotAccepted, errors.New("cfg by bin size is empty")
@@ -170,6 +169,10 @@ func (s *BBRSIStrategy) processBB(candles []bitmex.TradeBuck, size models.BinSiz
 		s.log.Debugf("saveSignals db.SaveSignal bolinger band error: %v", err)
 		return NotAccepted, err
 	}
+	if action == NotAccepted { // rsi returned NotAccepted, only save bb signal
+		return NotAccepted, nil
+	}
+
 	lastCandles := s.fetchLastCandlesForBB(size.String(), candles)
 	if len(lastCandles) == 0 {
 		err := errors.New("processBB last candles fo BB signal is empty")

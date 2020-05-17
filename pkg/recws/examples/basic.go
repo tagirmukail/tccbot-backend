@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/recws-org/recws"
+	"github.com/tagirmukail/tccbot-backend/pkg/recws"
 )
 
 func main() {

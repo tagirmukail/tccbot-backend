@@ -8,14 +8,16 @@ import (
 	"sync"
 	"syscall"
 
+	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
+
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
+	"github.com/tagirmukail/tccbot-backend/internal/db"
 
 	"github.com/tagirmukail/tccbot-backend/internal/strategies/strategy"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
-	"github.com/tagirmukail/tccbot-backend/internal/db"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 	"github.com/tagirmukail/tccbot-backend/internal/strategies"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
@@ -36,6 +38,7 @@ func main() {
 		logDir           string
 		initSignals      bool
 		migrationOnly    bool
+		step             int
 	)
 
 	flag.StringVar(&prof, "prof", "", "file name for profiling")
@@ -47,6 +50,7 @@ func main() {
 		"migration",
 		"up",
 		"database migration command:init, up, down, reset, version, set_version")
+	flag.IntVar(&step, "step", 0, "migration step")
 	flag.BoolVar(&testMode, "test", false, "Use exchanges to test mode")
 	flag.StringVar(&logDir, "logdir", "", "logs save directory")
 	flag.BoolVar(&initSignals, "siginit", false, "initialization previous signals.By default disabled")
@@ -77,15 +81,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if migrationOnly {
-		log.Info("migrations started")
-	}
-
-	dbManager, err := db.New(cfg, nil, log, db.Command(migrationCommand))
+	var dbManager db.DBManager
+	dbManager, err = db.NewDB(cfg, nil, log, migrate_db.Command(migrationCommand), step)
 	if err != nil {
-		log.Fatalf("db.New() error: %v", err)
+		log.Fatalf("migartion failed: %v", err)
 	}
-
 	if migrationOnly {
 		log.Info("migrations completed")
 		return

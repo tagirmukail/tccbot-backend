@@ -2,16 +2,32 @@ package db
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/mattn/go-sqlite3"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 )
 
-func (db *DB) SaveSignal(data models.Signal) (int64, error) {
+func (db *DB) SaveSignal(data models.Signal) (lastID int64, err error) {
+	for i := 0; i < db.retry; i++ {
+		lastID, err = db.saveSignal(data)
+		if err == sqlite3.ErrBusy {
+			db.log.Warnf("db is busy, wait to next")
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		break
+	}
+	if err != nil {
+		return 0, err
+	}
+	return lastID, nil
+}
+
+func (db *DB) saveSignal(data models.Signal) (int64, error) {
 	var (
 		createdAt    = time.Now().Unix()
 		lastID       int64
@@ -26,13 +42,13 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if len(existSignals) != 0 { // signal already exist, is not error - is feature )))
+	if len(existSignals) != 0 {
 		return existSignals[0].ID, nil
 	}
 
 	data.CreatedAt = createdAt
 	data.UpdatedAt = createdAt
-	err = db.db.QueryRow(`INSERT INTO signals(
+	result, err := db.db.Exec(`INSERT INTO signals(
                     n,
                     macd_fast,
                     macd_slow,
@@ -50,7 +66,7 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
                     updated_at
 	) VALUES (
 	          $1, $2,$3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-	) RETURNING id`,
+	)`,
 		data.N,
 		data.MACDFast,
 		data.MACDSlow,
@@ -66,10 +82,15 @@ func (db *DB) SaveSignal(data models.Signal) (int64, error) {
 		data.MACDHistogramValue,
 		data.CreatedAt,
 		data.UpdatedAt,
-	).Scan(&lastID)
+	)
 	if err != nil {
 		return 0, err
 	}
+	lastID, err = result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
 	if lastID == 0 {
 		return 0, errors.New("signal not inserted")
 	}
@@ -113,9 +134,8 @@ func (db *DB) GetSignalsByTs(
 	}
 
 	query, args, err := sqlx.In(
-		fmt.Sprintf(
-			`SELECT * FROM signals WHERE signal_t IN (%s) AND bin IN (%s) AND timestamp IN (?)`,
-			sigQueryBuild.String(), binQueryBuild.String()),
+		`SELECT * FROM signals WHERE signal_t IN (?) AND bin IN (?) AND timestamp IN (?)`,
+		sigQueryBuild.String(), binQueryBuild.String(),
 		ts)
 	if err != nil {
 		return nil, err
