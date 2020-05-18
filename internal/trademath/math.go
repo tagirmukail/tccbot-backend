@@ -25,6 +25,12 @@ type Singals struct {
 	}
 }
 
+type BB struct { // bolinger band
+	TL float64 // top
+	ML float64 // middle
+	BL float64 // bottom
+}
+
 type MACD struct {
 	HistogramValue float64 // histogram value
 	Value          float64 // macd value

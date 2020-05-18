@@ -229,8 +229,6 @@ func (r *WS) ping(wg *sync.WaitGroup) {
 					r.log.Fatal(err)
 				}
 			}
-		default:
-			continue
 		}
 	}
 

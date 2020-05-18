@@ -28,6 +28,8 @@ import (
 
 const maxCandles = 100
 
+// TODO перенести скрипты миграций в го файлы, чтоб не тащить повсюду за собой
+
 func main() {
 	var (
 		configPath       string

@@ -20,14 +20,13 @@ import (
 )
 
 type BBRSIStrategy struct {
-	cfg        *config.GlobalConfig
-	api        tradeapi.Api
-	math       trademath.Calc
-	orderProc  *orderproc.OrderProcessor
-	log        *logrus.Logger
-	db         db.DBManager
-	caches     candlecache.Caches
-	bbInAction AcceptAction
+	cfg       *config.GlobalConfig
+	api       tradeapi.Api
+	math      trademath.Calc
+	orderProc *orderproc.OrderProcessor
+	log       *logrus.Logger
+	db        db.DBManager
+	caches    candlecache.Caches
 }
 
 func NewBBRSIStrategy(
@@ -39,65 +38,93 @@ func NewBBRSIStrategy(
 	log *logrus.Logger,
 ) *BBRSIStrategy {
 	return &BBRSIStrategy{
-		cfg:        cfg,
-		api:        api,
-		orderProc:  orderProc,
-		db:         db,
-		log:        log,
-		bbInAction: NotAccepted,
-		math:       trademath.Calc{},
-		caches:     caches,
+		cfg:       cfg,
+		api:       api,
+		orderProc: orderProc,
+		db:        db,
+		log:       log,
+		math:      trademath.Calc{},
+		caches:    caches,
 	}
 }
 
 func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	s.log.Infof("start execute bb rsi strategy")
 	defer s.log.Infof("finish execute bb rsi strategy")
+
+	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	if cfg == nil {
+		return errors.New("cfg by bin size is empty")
+	}
+
 	candles, err := s.getCandles(size)
 	if err != nil {
 		return err
 	}
 
-	acceptAction, err := s.processRsi(candles, size)
+	rsi, err := s.processRsi(candles, size)
 	if err != nil {
 		return err
 	}
 
-	acceptAction, err = s.processBB(acceptAction, candles, size)
+	_, err = s.processBB(candles, size)
 	if err != nil {
 		return err
 	}
 
-	if acceptAction == NotAccepted {
-		switch s.bbInAction {
-		case UpAccepted:
-			return s.placeBitmexOrder(types.SideSell, true)
-		case DownAccepted:
-			return s.placeBitmexOrder(types.SideBuy, true)
-		default:
-			return nil
+	var (
+		lastCandles   []bitmex.TradeBuck
+		lastCandlesTs []time.Time
+		lastSignals   []*models.Signal
+		action        AcceptAction
+	)
+	if rsi.Value >= float64(cfg.RsiMaxBorder) || rsi.Value <= float64(cfg.RsiMinBorder) {
+		lastCandles = s.fetchLastCandlesForBB(size.String(), candles)
+		if len(lastCandles) == 0 {
+			err := errors.New("processBB last candles fo BB signal is empty")
+			s.log.Debug(err)
+			return err
 		}
+
+		lastCandlesTs, err = s.fetchTsFromCandles(lastCandles)
+		if err != nil {
+			return err
+		}
+
+		lastSignals, err = s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, lastCandlesTs)
+		if err != nil {
+			return err
+		}
+
+		action = s.processTrend(size, lastCandles, lastSignals)
 	}
-	s.bbInAction = NotAccepted
-	return nil
+
+	switch action {
+	case UpAccepted:
+		return s.placeBitmexOrder(types.SideSell, true)
+	case DownAccepted:
+		return s.placeBitmexOrder(types.SideBuy, true)
+	default:
+		return nil
+	}
 }
 
-func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSize) (AcceptAction, error) {
+func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSize) (rsi trademath.RSI, err error) {
 	s.log.Infof("start process rsi signal")
 	defer s.log.Infof("finish process rsi signal")
 
 	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
-		return NotAccepted, errors.New("cfg by bin size is empty")
+		return rsi, errors.New("cfg by bin size is empty")
 	}
 
-	err := s.checkCloses(candles)
+	err = s.checkCloses(candles)
 	if err != nil {
-		return NotAccepted, err
+		return rsi, err
 	}
 	closes := s.fetchCloses(candles)
 	if len(closes) < cfg.RsiCount {
-		return NotAccepted, errors.New("candles less than rsi count")
+		return rsi, errors.New("candles less than rsi count")
 	}
 
 	timestamp, err := time.Parse(
@@ -105,10 +132,10 @@ func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSi
 		candles[len(candles)-1].Timestamp,
 	)
 	if err != nil {
-		return NotAccepted, err
+		return rsi, err
 	}
 
-	rsi := s.math.CalcRSI(closes, cfg.RsiCount)
+	rsi = s.math.CalcRSI(closes, cfg.RsiCount)
 	_, err = s.db.SaveSignal(models.Signal{
 		N:           cfg.RsiCount,
 		BinSize:     size,
@@ -117,35 +144,26 @@ func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSi
 		SignalValue: rsi.Value,
 	})
 	if err != nil {
-		return NotAccepted, err
+		return rsi, err
 	}
-
-	if rsi.Value >= float64(cfg.RsiMaxBorder) {
-		s.log.Infof("max border is overcome up")
-		return UpAccepted, nil
-	} else if rsi.Value <= float64(cfg.RsiMinBorder) {
-		s.log.Infof("min border is overcome - down")
-		return DownAccepted, nil
-	}
-
-	return NotAccepted, nil
+	return rsi, nil
 }
 
 func (s *BBRSIStrategy) processBB(
-	action AcceptAction, candles []bitmex.TradeBuck, size models.BinSize,
-) (AcceptAction, error) {
+	candles []bitmex.TradeBuck, size models.BinSize,
+) (bb trademath.BB, err error) {
 	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
-		return NotAccepted, errors.New("cfg by bin size is empty")
+		return bb, errors.New("cfg by bin size is empty")
 	}
 	if len(candles) < cfg.BBLastCandlesCount {
 		s.log.Debug("processBBStrategyCandles there are fewer candles than necessary for the signal bolinger band")
-		return NotAccepted, errors.New("there are fewer candles than necessary for the signal bolinger band")
+		return bb, errors.New("there are fewer candles than necessary for the signal bolinger band")
 	}
 	closes := s.fetchCloses(candles)
 	if len(closes) == 0 {
 		s.log.Debug("processBBStrategyCandles closes is empty")
-		return NotAccepted, errors.New("all candles invalid")
+		return bb, errors.New("all candles invalid")
 	}
 	lastCandleTs, err := time.Parse(
 		tradeapi.TradeBucketedTimestampLayout,
@@ -153,7 +171,7 @@ func (s *BBRSIStrategy) processBB(
 	)
 	if err != nil {
 		s.log.Debugf("processBBStrategyCandles last candle timestamp parse error: %v", err)
-		return NotAccepted, err
+		return bb, err
 	}
 	tl, ml, bl := s.math.CalcBB(closes, talib.EMA)
 	_, err = s.db.SaveSignal(models.Signal{
@@ -167,30 +185,12 @@ func (s *BBRSIStrategy) processBB(
 	})
 	if err != nil {
 		s.log.Debugf("saveSignals db.SaveSignal bolinger band error: %v", err)
-		return NotAccepted, err
+		return bb, err
 	}
-	if action == NotAccepted { // rsi returned NotAccepted, only save bb signal
-		return NotAccepted, nil
-	}
-
-	lastCandles := s.fetchLastCandlesForBB(size.String(), candles)
-	if len(lastCandles) == 0 {
-		err := errors.New("processBB last candles fo BB signal is empty")
-		s.log.Debug(err)
-		return NotAccepted, err
-	}
-
-	lastCandlesTs, err := s.fetchTsFromCandles(lastCandles)
-	if err != nil {
-		return NotAccepted, err
-	}
-
-	lastSignals, err := s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, lastCandlesTs)
-	if err != nil {
-		return NotAccepted, err
-	}
-
-	return s.processTrend(size, lastCandles, lastSignals), nil
+	bb.TL = tl
+	bb.ML = ml
+	bb.BL = bl
+	return bb, nil
 }
 
 func (s *BBRSIStrategy) processTrend(binSize models.BinSize, candles []bitmex.TradeBuck, signals []*models.Signal) AcceptAction {
@@ -205,14 +205,12 @@ func (s *BBRSIStrategy) processTrend(binSize models.BinSize, candles []bitmex.Tr
 	if firstCandle.Close > firstSignal.BBTL {
 		// uptrend detection
 		if s.upTrend(binSize, candles[1:], signals[1:]) {
-			s.bbInAction = UpAccepted
 			return UpAccepted
 		}
 	}
 	if firstCandle.Close < firstSignal.BBBL {
 		// downtrend detection
 		if s.downTrend(binSize, candles[1:], signals[1:]) {
-			s.bbInAction = DownAccepted
 			return DownAccepted
 		}
 	}
