@@ -57,12 +57,12 @@ func (t SignalType) String() string {
 }
 
 func (t *SignalType) Scan(value interface{}) error {
-	sigType, ok := value.(string)
+	sigType, ok := value.([]uint8)
 	if !ok {
 		return fmt.Errorf("value type must be only string, but current: %T", value)
 	}
 	var err error
-	*t, err = ToSignalType(sigType)
+	*t, err = ToSignalType(string(sigType))
 	return err
 }
 

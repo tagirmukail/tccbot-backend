@@ -103,7 +103,7 @@ func (s *Strategies) processMACDSignals(
 	bearDiverg bool
 	bullDiverg bool
 }, err error) {
-	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.MACD}, []models.BinSize{binSize}, timestamps)
+	signals, err := s.db.GetSignalsByTs(models.MACD, binSize, timestamps)
 	if err != nil {
 		return result, err
 	}

@@ -91,7 +91,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 			return err
 		}
 
-		lastSignals, err = s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, lastCandlesTs)
+		lastSignals, err = s.db.GetSignalsByTs(models.BolingerBand, size, lastCandlesTs)
 		if err != nil {
 			return err
 		}

@@ -126,7 +126,7 @@ func (s *Strategies) macdSave(
 
 func (s *Strategies) rsiSave(
 	timestamp time.Time, size models.BinSize, closes []float64, step int) error {
-	signals, err := s.db.GetSignalsByTs([]models.SignalType{models.RSI}, []models.BinSize{size}, []time.Time{timestamp})
+	signals, err := s.db.GetSignalsByTs(models.RSI, size, []time.Time{timestamp})
 	if err != nil {
 		return err
 	}
@@ -176,7 +176,7 @@ func (s *Strategies) otherSignals(timestamp time.Time, size models.BinSize, clos
 	if step < s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).GetCandlesCount {
 		return nil
 	}
-	sigs, err := s.db.GetSignalsByTs([]models.SignalType{models.BolingerBand}, []models.BinSize{size}, []time.Time{timestamp})
+	sigs, err := s.db.GetSignalsByTs(models.BolingerBand, size, []time.Time{timestamp})
 	if err != nil {
 		return err
 	}

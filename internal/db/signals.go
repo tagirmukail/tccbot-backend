@@ -2,7 +2,7 @@ package db
 
 import (
 	"errors"
-	"strings"
+	"runtime/debug"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -28,12 +28,19 @@ func (db *DB) SaveSignal(data models.Signal) (lastID int64, err error) {
 }
 
 func (db *DB) saveSignal(data models.Signal) (int64, error) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			db.log.Errorf("saveSignal panic: %v", r)
+			debug.PrintStack()
+		}
+	}()
 	var (
 		createdAt    = time.Now().Unix()
 		lastID       int64
 		existSignals []*models.Signal
 	)
-	err := db.db.Select(&existSignals,
+	err := sqlx.Select(db.ql, &existSignals,
 		`SELECT id FROM signals WHERE signal_t=$1 AND bin=$2 AND timestamp=$3`,
 		data.SignalType.String(),
 		data.BinSize.String(),
@@ -42,13 +49,16 @@ func (db *DB) saveSignal(data models.Signal) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	for i, sig := range existSignals {
+		db.log.Debugf("saveSignal SQL SELECT RESULT[%d]:[%#v]", i, sig)
+	}
 	if len(existSignals) != 0 {
 		return existSignals[0].ID, nil
 	}
 
 	data.CreatedAt = createdAt
 	data.UpdatedAt = createdAt
-	result, err := db.db.Exec(`INSERT INTO signals(
+	result := sqlx.MustExec(db.ql, `INSERT INTO signals(
                     n,
                     macd_fast,
                     macd_slow,
@@ -83,9 +93,6 @@ func (db *DB) saveSignal(data models.Signal) (int64, error) {
 		data.CreatedAt,
 		data.UpdatedAt,
 	)
-	if err != nil {
-		return 0, err
-	}
 	lastID, err = result.LastInsertId()
 	if err != nil {
 		return 0, err
@@ -106,7 +113,7 @@ func (db *DB) saveSignal(data models.Signal) (int64, error) {
 //}
 
 func (db *DB) GetSignalsByTs(
-	signalTypes []models.SignalType, binSizes []models.BinSize, ts []time.Time,
+	signalType models.SignalType, binSize models.BinSize, ts []time.Time,
 ) ([]*models.Signal, error) {
 	var result = make([]*models.Signal, 0, len(ts)*2)
 
@@ -114,38 +121,25 @@ func (db *DB) GetSignalsByTs(
 		return result, nil
 	}
 
-	var sigQueryBuild = strings.Builder{}
-	for i, sigT := range signalTypes {
-		sigQueryBuild.WriteString("'")
-		sigQueryBuild.WriteString(sigT.String())
-		sigQueryBuild.WriteString("'")
-		if i != len(signalTypes)-1 {
-			sigQueryBuild.WriteString(",")
-		}
-	}
-	var binQueryBuild = strings.Builder{}
-	for i, binS := range binSizes {
-		binQueryBuild.WriteString("'")
-		binQueryBuild.WriteString(binS.String())
-		binQueryBuild.WriteString("'")
-		if i != len(binSizes)-1 {
-			binQueryBuild.WriteString(",")
-		}
+	var tsArgs []string
+	for _, t := range ts {
+		tsArgs = append(tsArgs, t.Format("2006-01-02 15:04:05+00:00"))
 	}
 
 	query, args, err := sqlx.In(
-		`SELECT * FROM signals WHERE signal_t IN (?) AND bin IN (?) AND timestamp IN (?)`,
-		sigQueryBuild.String(), binQueryBuild.String(),
-		ts)
+		`SELECT * FROM signals WHERE signal_t=? AND bin=? AND timestamp IN (?)`,
+		signalType.String(), binSize.String(), tsArgs)
 	if err != nil {
 		return nil, err
 	}
 
 	query = db.db.Rebind(query)
-	err = db.db.Select(&result, query, args...)
+	err = sqlx.Select(db.ql, &result, query, args...)
 	if err != nil {
 		return nil, err
 	}
-
+	for i, sig := range result {
+		db.log.Debugf("GetSignalsByTs SQL RESULT[%d]:[%#v]", i, sig)
+	}
 	return result, nil
 }

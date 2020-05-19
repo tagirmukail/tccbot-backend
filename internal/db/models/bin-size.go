@@ -31,12 +31,12 @@ func (b BinSize) String() string {
 }
 
 func (b *BinSize) Scan(value interface{}) error {
-	bin, ok := value.(string)
+	bin, ok := value.([]uint8)
 	if !ok {
 		return fmt.Errorf("value type must be only string, but current:%T", value)
 	}
 	var err error
-	*b, err = ToBinSize(bin)
+	*b, err = ToBinSize(string(bin))
 	return err
 }
 
