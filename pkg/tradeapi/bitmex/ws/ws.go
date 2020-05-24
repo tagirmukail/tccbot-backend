@@ -217,7 +217,7 @@ func (r *WS) ping(wg *sync.WaitGroup) {
 		case <-done:
 			err := r.ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				r.log.Errorf("write close ws failed", "error", err)
+				r.log.Errorf("write close ws failed:%v", err)
 			}
 			return
 		case <-tick.C:

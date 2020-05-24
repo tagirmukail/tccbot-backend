@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+
+	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
+	"github.com/tagirmukail/tccbot-backend/internal/config"
+
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
@@ -15,7 +21,7 @@ import (
 
 const limitMinOnOrderQty = 100
 
-func (s *BBRSIStrategy) checkCloses(candles []bitmex.TradeBuck) error {
+func checkCloses(candles []bitmex.TradeBuck) error {
 	for _, candle := range candles {
 		if candle.Close == 0 {
 			return errors.New("candles not full, exist empty close values")
@@ -24,7 +30,7 @@ func (s *BBRSIStrategy) checkCloses(candles []bitmex.TradeBuck) error {
 	return nil
 }
 
-func (s *BBRSIStrategy) fetchCloses(candles []bitmex.TradeBuck) []float64 {
+func fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	var result []float64
 	for _, candle := range candles {
 		if candle.Close == 0 {
@@ -51,7 +57,7 @@ func (s *BBRSIStrategy) getCandles(binSize models.BinSize) ([]bitmex.TradeBuck, 
 	return candles, nil
 }
 
-func (s *BBRSIStrategy) fetchTsFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
+func fetchTsFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
 	var result []time.Time
 	for _, candle := range candles {
 		candleTs, err := time.Parse(tradeapi.TradeBucketedTimestampLayout, candle.Timestamp)
@@ -72,10 +78,21 @@ func (s *BBRSIStrategy) fetchLastCandlesForBB(binSize string, candles []bitmex.T
 	return result
 }
 
-func (s *BBRSIStrategy) placeBitmexOrder(side types.Side, passive bool) error {
-	balance, err := s.orderProc.GetBalance()
+func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([]bitmex.TradeBuck, error) {
+	startTime, err := utils.FromTime(time.Now().UTC(), binSize.String(), count)
 	if err != nil {
-		s.log.Warnf("orderProc.GetBalance failed: %v", err)
+		return nil, err
+	}
+	candles := caches.GetCache(binSize).GetBucketed(startTime, time.Time{}, count)
+	return candles, nil
+}
+
+func placeBitmexOrder(
+	gcfg *config.GlobalConfig, orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
+) error {
+	balance, err := orderProc.GetBalance()
+	if err != nil {
+		log.Warnf("orderProc.GetBalance failed: %v", err)
 		return err
 	}
 	contracts := trademath.ConvertFromBTCToContracts(balance)
@@ -83,14 +100,14 @@ func (s *BBRSIStrategy) placeBitmexOrder(side types.Side, passive bool) error {
 		return fmt.Errorf("balance is exhausted, %.3f left", balance)
 	}
 
-	amount := utils.RandomRange(limitMinOnOrderQty, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
+	amount := utils.RandomRange(limitMinOnOrderQty, gcfg.ExchangesSettings.Bitmex.MaxAmount)
 
-	ord, err := s.orderProc.PlaceOrder(types.Bitmex, side, amount, passive)
+	ord, err := orderProc.PlaceOrder(types.Bitmex, side, amount, passive)
 	if err != nil {
-		s.log.Warnf("orderProc.PlaceOrder failed: %v", err)
+		log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err
 	}
 
-	s.log.Infof("sell order placed: %#v", ord)
+	log.Infof("%s order placed: %#v", side, ord)
 	return nil
 }

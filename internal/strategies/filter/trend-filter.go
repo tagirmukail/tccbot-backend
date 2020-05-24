@@ -1,0 +1,106 @@
+package filter
+
+import (
+	"context"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/tagirmukail/tccbot-backend/internal/config"
+	stratypes "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
+	"github.com/tagirmukail/tccbot-backend/internal/types"
+)
+
+// TrendFilter - this filter is designed to filter out false signals
+type TrendFilter struct {
+	prevActions []stratypes.Action
+	cfg         *config.GlobalConfig
+	log         *logrus.Logger
+	maxPrev     int
+}
+
+func NewFilter(cfg *config.GlobalConfig, log *logrus.Logger) *TrendFilter {
+	return &TrendFilter{
+		cfg:         cfg,
+		prevActions: make([]stratypes.Action, 0, 4),
+		log:         log,
+		maxPrev:     maxPrev,
+	}
+}
+
+func (f *TrendFilter) Apply(ctx context.Context) types.Side {
+	act := ctx.Value("action")
+	if act == nil {
+		f.log.Debug("TrendFilter.Apply - context action is <nil>")
+		return types.SideEmpty
+	}
+	action, ok := act.(stratypes.Action)
+	if !ok {
+		f.log.Debug("TrendFilter.Apply - context action type is not <Action>")
+		return types.SideEmpty
+	}
+	if err := action.Validate(); err != nil {
+		f.log.Debugf("action validate error:%v", err)
+		return types.SideEmpty
+	}
+
+	return f.checkAction(action)
+}
+
+func (f *TrendFilter) checkAction(action stratypes.Action) types.Side {
+	f.addInPrevAction(action)
+	// тренд прерывается, проверяем, если первый тренд экшенов - восходящий тренд,
+	// а остальные - это иные экшены, то тогда выставляем на продажу, если первый - нисходящий тренд,
+	// а остальные иные экшены, то выставляем на покупку, если остальные экшены(хотя бы один) такие же как и первый,
+	// то продолжаем наблюдение, выходим без действия
+
+	// the trend is interrupted, we check if the first trend of actions is an uptrend,
+	// and the rest are different actions,
+	// then we put up for sale, if the first is a downtrend and the rest are other actions,
+	// then we put up for purchase, if the rest of the actions (at least one) same as the first one,
+	// then continue to observe, exit without action
+	f.log.Debug("TrendFilter.Apply - checkAction check prev actions")
+	return f.checkPrevActions()
+}
+
+func (f *TrendFilter) checkPrevActions() types.Side {
+	if len(f.prevActions) < f.maxPrev {
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - prev action count less than maxPrevCount, exit")
+		return types.SideEmpty
+	}
+	firstAction := f.prevActions[0]
+	secondHalf := f.prevActions[1:]
+
+	isUpFirstAction := firstAction == stratypes.UpTrend
+	isAnyUpSecondHalf := checkAnyTrend(secondHalf, stratypes.UpTrend)
+	if isUpFirstAction && isAnyUpSecondHalf { // in the second half actions exist up, continue to observe
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - up trend is continue, exit")
+		return types.SideEmpty
+	}
+	if isUpFirstAction && !isAnyUpSecondHalf { // in the second half not exist up actions, trend ended movement - sell
+		f.prevActions = f.prevActions[:0]
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - up trend is complete, place sell, exit")
+		return types.SideSell
+	}
+
+	isDownFirstAction := firstAction == stratypes.DownTrend
+	isAnyDownSecondHalf := checkAnyTrend(secondHalf, stratypes.DownTrend)
+	if isDownFirstAction && isAnyDownSecondHalf { // in the second half actions exist down, continue to observe
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - down trend is continue, exit")
+		return types.SideEmpty
+	}
+	if isDownFirstAction && !isAnyDownSecondHalf { // in the second half not exist down actions, trend ended movement - buy
+		f.prevActions = f.prevActions[:0]
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - down trend is complete, place buy, exit")
+		return types.SideBuy
+	}
+
+	f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - not up and not down trend, exit")
+	return types.SideEmpty
+}
+
+func (f *TrendFilter) addInPrevAction(action stratypes.Action) {
+	f.prevActions = append(f.prevActions, action)
+	if len(f.prevActions) >= f.maxPrev {
+		f.prevActions = f.prevActions[len(f.prevActions)-f.maxPrev:]
+	}
+}

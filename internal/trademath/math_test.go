@@ -48,13 +48,13 @@ func TestCalc_CalculateSignals(t *testing.T) {
 			},
 			want: Singals{
 				SMA: 1112,
-				WMA: 1113.0909,
+				WMA: 1112.5714,
 				EMA: 1112,
 				BB: struct {
 					TL float64
 					ML float64
 					BL float64
-				}{1127.5791, 1111.4, 1095.221},
+				}{1127.3101, 1112, 1096.69},
 			},
 		},
 	}
@@ -253,9 +253,9 @@ func TestCalc_CalculateMACD(t *testing.T) {
 				},
 			},
 			want: MACD{
-				HistogramValue: 2.907,
-				Value:          3.857,
-				Sig:            0.9514,
+				HistogramValue: 1.282,
+				Value:          1.447,
+				Sig:            0.166,
 			},
 		},
 	}

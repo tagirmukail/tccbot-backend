@@ -13,6 +13,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/internal/db"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
+	"github.com/tagirmukail/tccbot-backend/internal/strategies/filter"
+	stratypes "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
@@ -27,6 +29,7 @@ type BBRSIStrategy struct {
 	log       *logrus.Logger
 	db        db.DBManager
 	caches    candlecache.Caches
+	filters   []filter.Filter
 }
 
 func NewBBRSIStrategy(
@@ -36,6 +39,7 @@ func NewBBRSIStrategy(
 	db db.DBManager,
 	caches candlecache.Caches,
 	log *logrus.Logger,
+	filters ...filter.Filter,
 ) *BBRSIStrategy {
 	return &BBRSIStrategy{
 		cfg:       cfg,
@@ -45,6 +49,7 @@ func NewBBRSIStrategy(
 		log:       log,
 		math:      trademath.Calc{},
 		caches:    caches,
+		filters:   filters,
 	}
 }
 
@@ -76,7 +81,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		lastCandles   []bitmex.TradeBuck
 		lastCandlesTs []time.Time
 		lastSignals   []*models.Signal
-		action        AcceptAction
+		action        stratypes.Action
 	)
 	if rsi.Value >= float64(cfg.RsiMaxBorder) || rsi.Value <= float64(cfg.RsiMinBorder) {
 		lastCandles = s.fetchLastCandlesForBB(size.String(), candles)
@@ -86,7 +91,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 			return err
 		}
 
-		lastCandlesTs, err = s.fetchTsFromCandles(lastCandles)
+		lastCandlesTs, err = fetchTsFromCandles(lastCandles)
 		if err != nil {
 			return err
 		}
@@ -99,14 +104,32 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action = s.processTrend(size, lastCandles, lastSignals)
 	}
 
-	switch action {
-	case UpAccepted:
-		return s.placeBitmexOrder(types.SideSell, true)
-	case DownAccepted:
-		return s.placeBitmexOrder(types.SideBuy, true)
+	applySide := s.ApplyFilters(action, candles)
+	switch applySide {
+	case types.SideSell:
+		return placeBitmexOrder(s.cfg, s.orderProc, types.SideSell, true, s.log)
+	case types.SideBuy:
+		return placeBitmexOrder(s.cfg, s.orderProc, types.SideBuy, true, s.log)
 	default:
 		return nil
 	}
+}
+
+func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck) types.Side {
+	if len(s.filters) == 0 {
+		s.log.Debugf("filters is empty")
+		return types.SideEmpty
+	}
+	ctx := context.WithValue(context.Background(), "action", action)
+	ctx = context.WithValue(ctx, "candles", candles)
+	applySide := types.SideEmpty
+	for _, f := range s.filters {
+		applySide = f.Apply(ctx)
+		if applySide == types.SideEmpty {
+			return applySide
+		}
+	}
+	return applySide
 }
 
 func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSize) (rsi trademath.RSI, err error) {
@@ -118,11 +141,11 @@ func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSi
 		return rsi, errors.New("cfg by bin size is empty")
 	}
 
-	err = s.checkCloses(candles)
+	err = checkCloses(candles)
 	if err != nil {
 		return rsi, err
 	}
-	closes := s.fetchCloses(candles)
+	closes := fetchCloses(candles)
 	if len(closes) < cfg.RsiCount {
 		return rsi, errors.New("candles less than rsi count")
 	}
@@ -160,7 +183,7 @@ func (s *BBRSIStrategy) processBB(
 		s.log.Debug("processBBStrategyCandles there are fewer candles than necessary for the signal bolinger band")
 		return bb, errors.New("there are fewer candles than necessary for the signal bolinger band")
 	}
-	closes := s.fetchCloses(candles)
+	closes := fetchCloses(candles)
 	if len(closes) == 0 {
 		s.log.Debug("processBBStrategyCandles closes is empty")
 		return bb, errors.New("all candles invalid")
@@ -193,11 +216,13 @@ func (s *BBRSIStrategy) processBB(
 	return bb, nil
 }
 
-func (s *BBRSIStrategy) processTrend(binSize models.BinSize, candles []bitmex.TradeBuck, signals []*models.Signal) AcceptAction {
+func (s *BBRSIStrategy) processTrend(
+	binSize models.BinSize, candles []bitmex.TradeBuck, signals []*models.Signal,
+) stratypes.Action {
 	candlesCount, signalsCount := len(candles), len(signals)
 	if candlesCount != signalsCount || candlesCount == 0 || signalsCount == 0 {
 		s.log.Debugf("processTrend - count candles:%d, but signals:%d", candlesCount, signalsCount)
-		return NotAccepted
+		return stratypes.NotTrend
 	}
 
 	s.log.Infof("start process bolinger band trend")
@@ -205,17 +230,17 @@ func (s *BBRSIStrategy) processTrend(binSize models.BinSize, candles []bitmex.Tr
 	if firstCandle.Close > firstSignal.BBTL {
 		// uptrend detection
 		if s.upTrend(binSize, candles[1:], signals[1:]) {
-			return UpAccepted
+			return stratypes.UpTrend
 		}
 	}
 	if firstCandle.Close < firstSignal.BBBL {
 		// downtrend detection
 		if s.downTrend(binSize, candles[1:], signals[1:]) {
-			return DownAccepted
+			return stratypes.DownTrend
 		}
 	}
 	s.log.Infof("finish process bolinger band trend")
-	return NotAccepted
+	return stratypes.NotTrend
 }
 
 func (s *BBRSIStrategy) upTrend(binSize models.BinSize, candles []bitmex.TradeBuck, signals []*models.Signal) bool {
