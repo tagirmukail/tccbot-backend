@@ -21,10 +21,11 @@ import (
 )
 
 type OrderProcessor struct {
-	tickPeriod time.Duration
-	api        tradeapi.Api
-	log        *logrus.Logger
-	cfg        *config.GlobalConfig
+	tickPeriod      time.Duration
+	api             tradeapi.Api
+	log             *logrus.Logger
+	cfg             *config.GlobalConfig
+	currentPosition bitmex.Position
 }
 
 func New(api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger) *OrderProcessor {
@@ -78,6 +79,9 @@ func (o *OrderProcessor) processPosition() error {
 		return err
 	}
 	for _, position := range positions {
+		if position.Symbol == o.cfg.ExchangesSettings.Bitmex.Symbol {
+			o.currentPosition = position
+		}
 		if trademath.ConvertToBTC(position.UnrealisedPnl) >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
 			if position.OpeningQty > 0 {
 				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true)
@@ -148,6 +152,10 @@ func (o *OrderProcessor) PlaceOrder(
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
+		err := o.checkLimitContracts(side)
+		if err != nil {
+			return nil, err
+		}
 		inst, err := o.getPrices()
 		if err != nil {
 			return nil, err
@@ -211,4 +219,24 @@ func (o *OrderProcessor) getPrices() (bitmex.Instrument, error) {
 		return resp, errors.New("instruments not exist")
 	}
 	return insts[0], nil
+}
+
+func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
+	switch side {
+	case types.SideSell:
+		isLimitedShort := o.currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		if isLimitedShort {
+			return fmt.Errorf("place sell order limitted - qty: %d, limit: %d",
+				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		}
+	case types.SideBuy:
+		isLimitedLong := o.currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		if isLimitedLong {
+			return fmt.Errorf("place buy order limitted - qty: %d, limit: %d",
+				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		}
+	default:
+		break
+	}
+	return nil
 }
