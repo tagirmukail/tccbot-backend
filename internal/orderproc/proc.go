@@ -20,6 +20,12 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
+const (
+	PassiveOrderType      = "ParticipateDoNotInitiate"
+	limitBalanceContracts = 200
+	limitMinOnOrderQty    = 100
+)
+
 type OrderProcessor struct {
 	tickPeriod      time.Duration
 	api             tradeapi.Api
@@ -152,7 +158,15 @@ func (o *OrderProcessor) PlaceOrder(
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
-		err := o.checkLimitContracts(side)
+		balance, err := o.GetBalance()
+		if err != nil {
+			return nil, err
+		}
+		contracts := trademath.ConvertFromBTCToContracts(balance)
+		if contracts <= limitBalanceContracts {
+			return nil, fmt.Errorf("balance is exhausted, %.3f left", balance)
+		}
+		err = o.checkLimitContracts(side)
 		if err != nil {
 			return nil, err
 		}
@@ -167,6 +181,21 @@ func (o *OrderProcessor) PlaceOrder(
 			price = inst.BidPrice
 		}
 
+		if amount == 0 {
+			position, err := o.getPosition()
+			if err != nil {
+				return nil, err
+			}
+			amount, err = o.calcOrderQty(
+				position,
+				balance,
+				side,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		params := &bitmex.OrderNewParams{
 			Symbol:    o.cfg.ExchangesSettings.Bitmex.Symbol,
 			Side:      string(side),
@@ -175,7 +204,7 @@ func (o *OrderProcessor) PlaceOrder(
 			Price:     price,
 		}
 		if passive {
-			params.ExecInst = "ParticipateDoNotInitiate"
+			params.ExecInst = PassiveOrderType
 		}
 		o.log.Infof("create order params: %#v", params)
 		order, err := o.api.GetBitmex().CreateOrder(params)
@@ -239,4 +268,50 @@ func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
 		break
 	}
 	return nil
+}
+
+func (o *OrderProcessor) getPosition() (*bitmex.Position, error) {
+	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
+		Filter: fmt.Sprintf(`{"symbol": "%s"}`, o.cfg.ExchangesSettings.Bitmex.Symbol),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, position := range positions {
+		if position.Symbol == o.cfg.ExchangesSettings.Bitmex.Symbol {
+			o.currentPosition = position
+			return &position, nil
+		}
+	}
+
+	return nil, errors.New("position not exist")
+}
+
+// calcOrderQty in contracts
+func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64, side types.Side) (qtyContrts float64, err error) {
+	positionPnlToBTC := trademath.ConvertToBTC(position.UnrealisedPnl)
+	if positionPnlToBTC > 0 {
+		qtyContrts = math.Abs(float64(position.OpeningQty))
+		return
+	}
+
+	switch side {
+	case types.SideBuy:
+		qtyContrts = balance * o.cfg.ExchangesSettings.Bitmex.BuyOrderCoef
+	case types.SideSell:
+		qtyContrts = balance * o.cfg.ExchangesSettings.Bitmex.SellOrderCoef
+	default:
+		err = fmt.Errorf("unknown side type: %s", side)
+		return
+	}
+
+	fmt.Println("BTC---------->", qtyContrts)
+	qtyContrts = trademath.ConvertFromBTCToContracts(qtyContrts)
+
+	if qtyContrts < float64(limitMinOnOrderQty) {
+		qtyContrts = float64(limitMinOnOrderQty)
+	}
+
+	qtyContrts = math.Round(qtyContrts)
+	return
 }

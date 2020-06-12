@@ -21,14 +21,5 @@ test-unit-cover:
 test-examples-tradeapi-bitmex:
 	GO111MODULE=$(GO111MODULE) $(GOTEST) -tags examples ./pkg/tradeapi/bitmex
 
-init-test-db:
-	docker run -d --name tccbot_db --restart=always -v /home/$(USER)/tccbot_db:/var/lib/postgresql/data -p 5432:5432 -e POSTGRES_PASSWORD=123456 -e POSTGRES_DB=tccbot_db postgres
-
-start-db:
-	docker start tccbot_db
-
-stop-db:
-	docker stop tccbot_db
-
 build-image:
 	docker build -t tccbot -f Dockerfile .

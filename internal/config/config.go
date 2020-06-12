@@ -123,6 +123,8 @@ type ApiSettings struct {
 	MaxAmount           float64
 	ClosePositionMinBTC float64
 	LimitContractsCount int
+	SellOrderCoef       float64
+	BuyOrderCoef        float64
 }
 
 type BitmexCfg struct {
@@ -194,6 +196,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			MaxAmount:           130,
 			ClosePositionMinBTC: 0.0005,
 			LimitContractsCount: 300,
+			BuyOrderCoef:        0.2,
+			SellOrderCoef:       0.1,
 		}
 	} else {
 		bitmex = ApiSettings{
@@ -208,6 +212,8 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			MaxAmount:           viper.GetFloat64("exchanges_settings.bitmex.max_amount"),
 			ClosePositionMinBTC: viper.GetFloat64("exchanges_settings.bitmex.close_position_min_btc"),
 			LimitContractsCount: viper.GetInt("exchanges_settings.bitmex.limit_contracts_cnt"),
+			BuyOrderCoef:        viper.GetFloat64("exchanges_settings.bitmex.buy_order_coef"),
+			SellOrderCoef:       viper.GetFloat64("exchanges_settings.bitmex.sell_order_coef"),
 		}
 	}
 	fmt.Println("--------------------------------------------")

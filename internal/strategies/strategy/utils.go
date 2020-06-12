@@ -2,24 +2,24 @@ package strategy
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
-	"github.com/tagirmukail/tccbot-backend/internal/config"
 
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/internal/utils"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const limitMinOnOrderQty = 100
+const (
+	limitMinOnOrderQty    = 100
+	limitBalanceContracts = 200
+)
 
 func checkCloses(candles []bitmex.TradeBuck) error {
 	for _, candle := range candles {
@@ -88,21 +88,9 @@ func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([
 }
 
 func placeBitmexOrder(
-	gcfg *config.GlobalConfig, orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
+	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
 ) error {
-	balance, err := orderProc.GetBalance()
-	if err != nil {
-		log.Warnf("orderProc.GetBalance failed: %v", err)
-		return err
-	}
-	contracts := trademath.ConvertFromBTCToContracts(balance)
-	if contracts <= 3 {
-		return fmt.Errorf("balance is exhausted, %.3f left", balance)
-	}
-
-	amount := utils.RandomRange(limitMinOnOrderQty, gcfg.ExchangesSettings.Bitmex.MaxAmount)
-
-	ord, err := orderProc.PlaceOrder(types.Bitmex, side, amount, passive)
+	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive)
 	if err != nil {
 		log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err

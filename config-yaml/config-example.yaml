@@ -12,6 +12,8 @@ exchanges_settings:
     max_amount: 120 # max qty for creating order
     close_position_min_btc: 0.0004 # if unrealized pnl great than this value, place order by position
     limit_contracts_cnt: 350 # if position active contracts greater than, not place new orders
+    sell_order_coef: 0.1
+    buy_order_coef: 0.2
 
   binance:
     test: true
