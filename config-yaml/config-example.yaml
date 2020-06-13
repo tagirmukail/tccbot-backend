@@ -9,11 +9,11 @@ exchanges_settings:
     order_type: Limit # Market, Limit, Stop, StopLimit, StopMarket
     currency: XBt
     symbol: XBTUSD
-    max_amount: 120 # max qty for creating order
+    max_amount: 120 # max qty for creating order // DEPRECATED
     close_position_min_btc: 0.0004 # if unrealized pnl great than this value, place order by position
     limit_contracts_cnt: 350 # if position active contracts greater than, not place new orders
-    sell_order_coef: 0.1
-    buy_order_coef: 0.2
+    sell_order_coef: 0.1 # coefficient * available balance = number of contracts for placing a sell order
+    buy_order_coef: 0.2 # coefficient * available balance = number of contracts for placing a buy order
 
   binance:
     test: true

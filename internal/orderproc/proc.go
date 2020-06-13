@@ -297,17 +297,18 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 		return
 	}
 
+	var qtyBtc float64
 	switch side {
 	case types.SideBuy:
-		qtyContrts = balance * o.cfg.ExchangesSettings.Bitmex.BuyOrderCoef
+		qtyBtc = balance * o.cfg.ExchangesSettings.Bitmex.BuyOrderCoef
 	case types.SideSell:
-		qtyContrts = balance * o.cfg.ExchangesSettings.Bitmex.SellOrderCoef
+		qtyBtc = balance * o.cfg.ExchangesSettings.Bitmex.SellOrderCoef
 	default:
 		err = fmt.Errorf("unknown side type: %s", side)
 		return
 	}
 
-	qtyContrts = trademath.ConvertFromBTCToContracts(qtyContrts)
+	qtyContrts = trademath.ConvertFromBTCToContracts(qtyBtc)
 
 	if qtyContrts < float64(limitMinOnOrderQty) {
 		qtyContrts = float64(limitMinOnOrderQty)
