@@ -34,9 +34,10 @@ const (
 type OrdStatus string
 
 const (
-	OrdNew      OrdStatus = "New"
-	OrdFilled   OrdStatus = "Filled"
-	ordCanceled OrdStatus = "Canceled"
+	OrdNew             OrdStatus = "New"
+	OrdFilled          OrdStatus = "Filled"
+	OrdPartiallyFilled OrdStatus = "PartiallyFilled"
+	ordCanceled        OrdStatus = "Canceled"
 )
 
 type Theme string

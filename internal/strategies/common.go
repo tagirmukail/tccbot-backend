@@ -100,7 +100,7 @@ func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int {
 }
 
 func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalType) error {
-	balance, err := s.orderProc.GetBalance()
+	_, balance, err := s.orderProc.GetBalance()
 	if err != nil {
 		s.log.Warnf("orderProc.GetBalance failed: %v", err)
 		return err

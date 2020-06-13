@@ -110,7 +110,7 @@ func (o *OrderProcessor) procActiveOrders() error {
 	o.log.Infof("\n===============================\nstart process active orders")
 	defer o.log.Infof("finish process active orders\n===============================\n")
 
-	filter := fmt.Sprintf(`{"ordStatus":"%s"}`, types.OrdNew)
+	filter := fmt.Sprintf(`{"open": %t}`, true)
 	orders, err := o.api.GetBitmex().GetOrders(&bitmex.OrdersRequest{
 		Symbol: o.cfg.ExchangesSettings.Bitmex.Symbol,
 		Filter: filter,
@@ -158,13 +158,13 @@ func (o *OrderProcessor) PlaceOrder(
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
-		balance, err := o.GetBalance()
+		_, availableBalance, err := o.GetBalance()
 		if err != nil {
 			return nil, err
 		}
-		contracts := trademath.ConvertFromBTCToContracts(balance)
+		contracts := trademath.ConvertFromBTCToContracts(availableBalance)
 		if contracts <= limitBalanceContracts {
-			return nil, fmt.Errorf("balance is exhausted, %.3f left", balance)
+			return nil, fmt.Errorf("balance is exhausted, %.3f left", availableBalance)
 		}
 		err = o.checkLimitContracts(side)
 		if err != nil {
@@ -188,7 +188,7 @@ func (o *OrderProcessor) PlaceOrder(
 			}
 			amount, err = o.calcOrderQty(
 				position,
-				balance,
+				availableBalance,
 				side,
 			)
 			if err != nil {
@@ -217,21 +217,23 @@ func (o *OrderProcessor) PlaceOrder(
 	}
 }
 
-func (o *OrderProcessor) GetBalance() (float64, error) {
+func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, err error) {
 	margins, err := o.api.GetBitmex().GetAllUserMargin()
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if len(margins) == 0 {
-		return 0, errors.New("user margins not exist")
+		return 0, 0, errors.New("user margins not exist")
 	}
 	for _, margin := range margins {
 		if o.cfg.ExchangesSettings.Bitmex.Currency == margin.Currency {
-			return trademath.ConvertToBTC(margin.WalletBalance), nil
+			walletBalance = trademath.ConvertToBTC(margin.WalletBalance)
+			availableBalance = trademath.ConvertToBTC(margin.AvailableMargin)
+			return walletBalance, availableBalance, nil
 		}
 	}
 
-	return 0, fmt.Errorf("user margin by currency:%s not exist", o.cfg.ExchangesSettings.Bitmex.Currency)
+	return 0, 0, fmt.Errorf("user margin by currency:%s not exist", o.cfg.ExchangesSettings.Bitmex.Currency)
 }
 
 func (o *OrderProcessor) getPrices() (bitmex.Instrument, error) {
@@ -305,7 +307,6 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 		return
 	}
 
-	fmt.Println("BTC---------->", qtyContrts)
 	qtyContrts = trademath.ConvertFromBTCToContracts(qtyContrts)
 
 	if qtyContrts < float64(limitMinOnOrderQty) {
