@@ -18,3 +18,12 @@ func (a *Action) Validate() error {
 		return fmt.Errorf("unknown action - %v", a)
 	}
 }
+
+type CtxKey uint32
+
+const (
+	_ CtxKey = iota
+	ActionKey
+	CandlesKey
+	BinSizeKey
+)

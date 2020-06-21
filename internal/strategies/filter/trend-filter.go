@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
+	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	stratypes "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 )
@@ -15,20 +16,19 @@ type TrendFilter struct {
 	prevActions []stratypes.Action
 	cfg         *config.GlobalConfig
 	log         *logrus.Logger
-	maxPrev     int
 }
 
 func NewFilter(cfg *config.GlobalConfig, log *logrus.Logger) *TrendFilter {
+
 	return &TrendFilter{
 		cfg:         cfg,
-		prevActions: make([]stratypes.Action, 0, 4),
+		prevActions: make([]stratypes.Action, 0),
 		log:         log,
-		maxPrev:     maxPrev,
 	}
 }
 
 func (f *TrendFilter) Apply(ctx context.Context) types.Side {
-	act := ctx.Value("action")
+	act := ctx.Value(stratypes.ActionKey)
 	if act == nil {
 		f.log.Debug("TrendFilter.Apply - context action is <nil>")
 		return types.SideEmpty
@@ -43,11 +43,22 @@ func (f *TrendFilter) Apply(ctx context.Context) types.Side {
 		return types.SideEmpty
 	}
 
-	return f.checkAction(action)
+	binS := ctx.Value(stratypes.BinSizeKey)
+	if act == nil {
+		f.log.Debug("TrendFilter.Apply - context bin size is <nil>")
+		return types.SideEmpty
+	}
+	binSize, ok := binS.(models.BinSize)
+	if !ok {
+		f.log.Debug("TrendFilter.Apply - context key type is not <CtxKey>")
+		return types.SideEmpty
+	}
+
+	return f.checkAction(action, binSize)
 }
 
-func (f *TrendFilter) checkAction(action stratypes.Action) types.Side {
-	f.addInPrevAction(action)
+func (f *TrendFilter) checkAction(action stratypes.Action, size models.BinSize) types.Side {
+	f.addInPrevAction(action, size)
 	// тренд прерывается, проверяем, если первый тренд экшенов - восходящий тренд,
 	// а остальные - это иные экшены, то тогда выставляем на продажу, если первый - нисходящий тренд,
 	// а остальные иные экшены, то выставляем на покупку, если остальные экшены(хотя бы один) такие же как и первый,
@@ -59,12 +70,17 @@ func (f *TrendFilter) checkAction(action stratypes.Action) types.Side {
 	// then we put up for purchase, if the rest of the actions (at least one) same as the first one,
 	// then continue to observe, exit without action
 	f.log.Debug("TrendFilter.Apply - checkAction check prev actions")
-	return f.checkPrevActions()
+	return f.checkPrevActions(size)
 }
 
-func (f *TrendFilter) checkPrevActions() types.Side {
-	if len(f.prevActions) < f.maxPrev {
-		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - prev action count less than maxPrevCount, exit")
+func (f *TrendFilter) checkPrevActions(size models.BinSize) types.Side {
+	cfg := f.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	if cfg == nil {
+		f.log.Errorf("cfg by bin size is empty")
+		return types.SideEmpty
+	}
+	if len(f.prevActions) < cfg.MaxFilterTrendCount {
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - prev action count less than max_filter_trend_count, exit")
 		return types.SideEmpty
 	}
 	firstAction := f.prevActions[0]
@@ -98,9 +114,14 @@ func (f *TrendFilter) checkPrevActions() types.Side {
 	return types.SideEmpty
 }
 
-func (f *TrendFilter) addInPrevAction(action stratypes.Action) {
+func (f *TrendFilter) addInPrevAction(action stratypes.Action, size models.BinSize) {
+	cfg := f.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	if cfg == nil {
+		f.log.Errorf("cfg by bin size is empty")
+		return
+	}
 	f.prevActions = append(f.prevActions, action)
-	if len(f.prevActions) >= f.maxPrev {
-		f.prevActions = f.prevActions[len(f.prevActions)-f.maxPrev:]
+	if len(f.prevActions) >= cfg.MaxFilterTrendCount {
+		f.prevActions = f.prevActions[len(f.prevActions)-cfg.MaxFilterTrendCount:]
 	}
 }

@@ -84,18 +84,22 @@ func (s *StrategiesGlobConfig) GetBinSizes() []string {
 }
 
 type StrategiesConfig struct {
-	EnableMACD         bool
-	EnableRSIBB        bool
-	RetryProcessCount  int
-	GetCandlesCount    int
+	EnableMACD          bool
+	EnableRSIBB         bool
+	RetryProcessCount   int
+	GetCandlesCount     int
+	MaxFilterTrendCount int
+
 	BBLastCandlesCount int
-	RsiCount           int
-	RsiMinBorder       uint32
-	RsiMaxBorder       uint32
-	RsiTradeCoef       float64
-	MacdFastCount      int
-	MacdSlowCount      int
-	MacdSigCount       int
+
+	RsiCount     int
+	RsiMinBorder uint32
+	RsiMaxBorder uint32
+	RsiTradeCoef float64
+
+	MacdFastCount int
+	MacdSlowCount int
+	MacdSigCount  int
 }
 
 func (strategies *StrategiesConfig) AnyStrategyEnabled() bool {
@@ -228,6 +232,7 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 		strategies.EnableRSIBB = true
 		strategies.RetryProcessCount = 5
 		strategies.GetCandlesCount = 20
+		strategies.MaxFilterTrendCount = 4
 		strategies.BBLastCandlesCount = 4
 		strategies.RsiCount = 14
 		strategies.RsiMinBorder = 30
@@ -245,18 +250,19 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 			switch k {
 			case "1m":
 				var strategies = StrategiesConfig{
-					EnableMACD:         viper.GetBool("strategies_g.1m.enable_macd"),
-					EnableRSIBB:        viper.GetBool("strategies_g.1m.enable_rsi_bb"),
-					RetryProcessCount:  viper.GetInt("strategies_g.1m.retry_process_count"),
-					GetCandlesCount:    viper.GetInt("strategies_g.1m.get_candles_count"),
-					BBLastCandlesCount: viper.GetInt("strategies_g.1m.bb_last_candles_count"),
-					MacdFastCount:      viper.GetInt("strategies_g.1m.macd_fast_count"),
-					MacdSlowCount:      viper.GetInt("strategies_g.1m.macd_slow_count"),
-					MacdSigCount:       viper.GetInt("strategies_g.1m.macd_sig_count"),
-					RsiCount:           viper.GetInt("strategies_g.1m.rsi_count"),
-					RsiMinBorder:       viper.GetUint32("strategies_g.1m.rsi_min_border"),
-					RsiMaxBorder:       viper.GetUint32("strategies_g.1m.rsi_max_border"),
-					RsiTradeCoef:       viper.GetFloat64("strategies_g.1m.rsi_trade_coef"),
+					EnableMACD:          viper.GetBool("strategies_g.1m.enable_macd"),
+					EnableRSIBB:         viper.GetBool("strategies_g.1m.enable_rsi_bb"),
+					RetryProcessCount:   viper.GetInt("strategies_g.1m.retry_process_count"),
+					GetCandlesCount:     viper.GetInt("strategies_g.1m.get_candles_count"),
+					MaxFilterTrendCount: viper.GetInt("strategies_g.1m.max_filter_trend_count"),
+					BBLastCandlesCount:  viper.GetInt("strategies_g.1m.bb_last_candles_count"),
+					MacdFastCount:       viper.GetInt("strategies_g.1m.macd_fast_count"),
+					MacdSlowCount:       viper.GetInt("strategies_g.1m.macd_slow_count"),
+					MacdSigCount:        viper.GetInt("strategies_g.1m.macd_sig_count"),
+					RsiCount:            viper.GetInt("strategies_g.1m.rsi_count"),
+					RsiMinBorder:        viper.GetUint32("strategies_g.1m.rsi_min_border"),
+					RsiMaxBorder:        viper.GetUint32("strategies_g.1m.rsi_max_border"),
+					RsiTradeCoef:        viper.GetFloat64("strategies_g.1m.rsi_trade_coef"),
 				}
 				globalStrategies.M1 = &strategies
 				fmt.Println("--------------------------------------------")
@@ -264,18 +270,19 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 				fmt.Println("--------------------------------------------")
 			case "5m":
 				var strategies = StrategiesConfig{
-					EnableMACD:         viper.GetBool("strategies_g.5m.enable_macd"),
-					EnableRSIBB:        viper.GetBool("strategies_g.5m.enable_rsi_bb"),
-					RetryProcessCount:  viper.GetInt("strategies_g.5m.retry_process_count"),
-					GetCandlesCount:    viper.GetInt("strategies_g.5m.get_candles_count"),
-					BBLastCandlesCount: viper.GetInt("strategies_g.5m.bb_last_candles_count"),
-					MacdFastCount:      viper.GetInt("strategies_g.5m.macd_fast_count"),
-					MacdSlowCount:      viper.GetInt("strategies_g.5m.macd_slow_count"),
-					MacdSigCount:       viper.GetInt("strategies_g.5m.macd_sig_count"),
-					RsiCount:           viper.GetInt("strategies_g.5m.rsi_count"),
-					RsiMinBorder:       viper.GetUint32("strategies_g.5m.rsi_min_border"),
-					RsiMaxBorder:       viper.GetUint32("strategies_g.5m.rsi_max_border"),
-					RsiTradeCoef:       viper.GetFloat64("strategies_g.5m.rsi_trade_coef"),
+					EnableMACD:          viper.GetBool("strategies_g.5m.enable_macd"),
+					EnableRSIBB:         viper.GetBool("strategies_g.5m.enable_rsi_bb"),
+					RetryProcessCount:   viper.GetInt("strategies_g.5m.retry_process_count"),
+					GetCandlesCount:     viper.GetInt("strategies_g.5m.get_candles_count"),
+					MaxFilterTrendCount: viper.GetInt("strategies_g.5m.max_filter_trend_count"),
+					BBLastCandlesCount:  viper.GetInt("strategies_g.5m.bb_last_candles_count"),
+					MacdFastCount:       viper.GetInt("strategies_g.5m.macd_fast_count"),
+					MacdSlowCount:       viper.GetInt("strategies_g.5m.macd_slow_count"),
+					MacdSigCount:        viper.GetInt("strategies_g.5m.macd_sig_count"),
+					RsiCount:            viper.GetInt("strategies_g.5m.rsi_count"),
+					RsiMinBorder:        viper.GetUint32("strategies_g.5m.rsi_min_border"),
+					RsiMaxBorder:        viper.GetUint32("strategies_g.5m.rsi_max_border"),
+					RsiTradeCoef:        viper.GetFloat64("strategies_g.5m.rsi_trade_coef"),
 				}
 				globalStrategies.M5 = &strategies
 				fmt.Println("--------------------------------------------")
@@ -283,18 +290,19 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 				fmt.Println("--------------------------------------------")
 			case "1h":
 				var strategies = StrategiesConfig{
-					EnableMACD:         viper.GetBool("strategies_g.1h.enable_macd"),
-					EnableRSIBB:        viper.GetBool("strategies_g.1h.enable_rsi_bb"),
-					RetryProcessCount:  viper.GetInt("strategies_g.1h.retry_process_count"),
-					GetCandlesCount:    viper.GetInt("strategies_g.1h.get_candles_count"),
-					BBLastCandlesCount: viper.GetInt("strategies_g.1h.bb_last_candles_count"),
-					MacdFastCount:      viper.GetInt("strategies_g.1h.macd_fast_count"),
-					MacdSlowCount:      viper.GetInt("strategies_g.1h.macd_slow_count"),
-					MacdSigCount:       viper.GetInt("strategies_g.1h.macd_sig_count"),
-					RsiCount:           viper.GetInt("strategies_g.1h.rsi_count"),
-					RsiMinBorder:       viper.GetUint32("strategies_g.1h.rsi_min_border"),
-					RsiMaxBorder:       viper.GetUint32("strategies_g.1h.rsi_max_border"),
-					RsiTradeCoef:       viper.GetFloat64("strategies_g.1h.rsi_trade_coef"),
+					EnableMACD:          viper.GetBool("strategies_g.1h.enable_macd"),
+					EnableRSIBB:         viper.GetBool("strategies_g.1h.enable_rsi_bb"),
+					RetryProcessCount:   viper.GetInt("strategies_g.1h.retry_process_count"),
+					GetCandlesCount:     viper.GetInt("strategies_g.1h.get_candles_count"),
+					MaxFilterTrendCount: viper.GetInt("strategies_g.1h.max_filter_trend_count"),
+					BBLastCandlesCount:  viper.GetInt("strategies_g.1h.bb_last_candles_count"),
+					MacdFastCount:       viper.GetInt("strategies_g.1h.macd_fast_count"),
+					MacdSlowCount:       viper.GetInt("strategies_g.1h.macd_slow_count"),
+					MacdSigCount:        viper.GetInt("strategies_g.1h.macd_sig_count"),
+					RsiCount:            viper.GetInt("strategies_g.1h.rsi_count"),
+					RsiMinBorder:        viper.GetUint32("strategies_g.1h.rsi_min_border"),
+					RsiMaxBorder:        viper.GetUint32("strategies_g.1h.rsi_max_border"),
+					RsiTradeCoef:        viper.GetFloat64("strategies_g.1h.rsi_trade_coef"),
 				}
 				globalStrategies.H1 = &strategies
 				fmt.Println("--------------------------------------------")

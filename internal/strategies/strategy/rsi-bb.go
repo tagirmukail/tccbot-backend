@@ -21,11 +21,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const (
-	actionKey  = "action"
-	candlesKey = "candles"
-)
-
 type BBRSIStrategy struct {
 	cfg       *config.GlobalConfig
 	api       tradeapi.Api
@@ -109,7 +104,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action = s.processTrend(size, lastCandles, lastSignals)
 	}
 
-	applySide := s.ApplyFilters(action, candles)
+	applySide := s.ApplyFilters(action, candles, size)
 	switch applySide {
 	case types.SideSell:
 		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log)
@@ -120,13 +115,14 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	}
 }
 
-func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck) types.Side {
+func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {
 	if len(s.filters) == 0 {
 		s.log.Debugf("filters is empty")
 		return types.SideEmpty
 	}
-	ctx := context.WithValue(context.Background(), actionKey, action)
-	ctx = context.WithValue(ctx, candlesKey, candles)
+	ctx := context.WithValue(context.Background(), stratypes.ActionKey, action)
+	ctx = context.WithValue(ctx, stratypes.CandlesKey, candles)
+	ctx = context.WithValue(ctx, stratypes.BinSizeKey, size)
 	applySide := types.SideEmpty
 	for _, f := range s.filters {
 		applySide = f.Apply(ctx)

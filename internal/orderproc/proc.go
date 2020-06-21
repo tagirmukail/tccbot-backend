@@ -24,6 +24,7 @@ const (
 	PassiveOrderType      = "ParticipateDoNotInitiate"
 	limitBalanceContracts = 200
 	limitMinOnOrderQty    = 100
+	liquidationPriceLimit = 1600
 )
 
 type OrderProcessor struct {
@@ -186,6 +187,10 @@ func (o *OrderProcessor) PlaceOrder(
 			if err != nil {
 				return nil, err
 			}
+			err = o.checkLiquidation(position, price, side)
+			if err != nil {
+				return nil, err
+			}
 			amount, err = o.calcOrderQty(
 				position,
 				availableBalance,
@@ -316,4 +321,20 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 
 	qtyContrts = math.Round(qtyContrts)
 	return
+}
+
+func (o *OrderProcessor) checkLiquidation(position *bitmex.Position, price float64, side types.Side) error {
+	liquidationDiff := math.Abs(position.LiquidationPrice - price)
+	isLiquidationWarn := liquidationDiff < liquidationPriceLimit
+	if position.OpeningQty < 0 &&
+		side == types.SideSell &&
+		isLiquidationWarn {
+		return errors.New("liquidation warning triggered; further placing of sell orders suspended")
+	}
+	if position.OpeningQty > 0 &&
+		side == types.SideBuy &&
+		isLiquidationWarn {
+		return errors.New("liquidation warning triggered; further placing of buy orders suspended")
+	}
+	return nil
 }
