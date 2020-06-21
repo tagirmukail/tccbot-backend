@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
+	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	types2 "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
@@ -29,17 +30,25 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg: nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log: logrus.New(),
 				prevActions: []types2.Action{
 					types2.DownTrend,
 					types2.NotTrend,
 					types2.UpTrend,
+					types2.NotTrend,
+					types2.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.NotTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideBuy,
 		}
@@ -57,17 +66,25 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg: nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log: logrus.New(),
 				prevActions: []types2.Action{
 					types2.UpTrend,
 					types2.DownTrend,
 					types2.NotTrend,
+					types2.NotTrend,
+					types2.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.NotTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideSell,
 		}
@@ -85,17 +102,24 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg: nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log: logrus.New(),
 				prevActions: []types2.Action{
 					types2.UpTrend,
 					types2.DownTrend,
 					types2.NotTrend,
+					types2.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.UpTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.UpTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -106,6 +130,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 		require.Equal(t, []types2.Action{
 			types2.UpTrend,
 			types2.DownTrend,
+			types2.NotTrend,
 			types2.NotTrend,
 			types2.UpTrend,
 		}, f.prevActions)
@@ -118,17 +143,24 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg: nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log: logrus.New(),
 				prevActions: []types2.Action{
 					types2.DownTrend,
 					types2.DownTrend,
 					types2.NotTrend,
+					types2.DownTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.DownTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.DownTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -141,6 +173,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			types2.DownTrend,
 			types2.NotTrend,
 			types2.DownTrend,
+			types2.DownTrend,
 		}, f.prevActions)
 	})
 
@@ -151,17 +184,25 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg: nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log: logrus.New(),
 				prevActions: []types2.Action{
+					types2.NotTrend,
+					types2.NotTrend,
 					types2.NotTrend,
 					types2.NotTrend,
 					types2.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.NotTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -170,6 +211,8 @@ func TestTrendFilter_Apply(t *testing.T) {
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
 		require.Equal(t, []types2.Action{
+			types2.NotTrend,
+			types2.NotTrend,
 			types2.NotTrend,
 			types2.NotTrend,
 			types2.NotTrend,
@@ -184,13 +227,19 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg:         nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log:         logrus.New(),
 				prevActions: []types2.Action{},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.NotTrend),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
+					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -210,7 +259,13 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg:         nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log:         logrus.New(),
 				prevActions: []types2.Action{},
 			},
@@ -233,7 +288,13 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg:         nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log:         logrus.New(),
 				prevActions: []types2.Action{},
 			},
@@ -257,7 +318,13 @@ func TestTrendFilter_Apply(t *testing.T) {
 			want   types.Side
 		}{
 			fields: fields{
-				cfg:         nil,
+				cfg: &config.GlobalConfig{
+					GlobStrategies: config.StrategiesGlobConfig{
+						M5: &config.StrategiesConfig{
+							MaxFilterTrendCount: 6,
+						},
+					},
+				},
 				log:         logrus.New(),
 				prevActions: []types2.Action{},
 			},
