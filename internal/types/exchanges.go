@@ -40,6 +40,12 @@ const (
 	ordCanceled        OrdStatus = "Canceled"
 )
 
+type PriceType string
+
+const (
+	TrailingStopPeg PriceType = "TrailingStopPeg"
+)
+
 type Theme string
 
 const (

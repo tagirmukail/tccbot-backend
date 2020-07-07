@@ -223,7 +223,7 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 
 		if withStop {
-			err = o.placeStopOrder(params, position)
+			err = o.placeStopOrder(params, types.LimitIfTouched, types.TrailingStopPeg, position)
 			if err != nil {
 				return nil, err
 			}
@@ -237,7 +237,9 @@ func (o *OrderProcessor) PlaceOrder(
 
 // placeStopOrder - place stop order
 // TODO: needed manual and unit or integration testing
-func (o *OrderProcessor) placeStopOrder(params *bitmex.OrderNewParams, position *bitmex.Position) error {
+func (o *OrderProcessor) placeStopOrder(
+	params *bitmex.OrderNewParams, ordType types.OrderType, priceType types.PriceType, _ *bitmex.Position,
+) error {
 	var (
 		stopPrice float64
 		stopSide  types.Side
@@ -257,9 +259,9 @@ func (o *OrderProcessor) placeStopOrder(params *bitmex.OrderNewParams, position 
 		Symbol:         params.Symbol,
 		StopPx:         stopPrice,
 		Price:          stopPrice,
-		OrderType:      "LimitIfTouched",
+		OrderType:      string(ordType),
 		Side:           string(stopSide),
-		PegPriceType:   "TrailingStopPeg",
+		PegPriceType:   string(priceType),
 		PegOffsetValue: offset,
 	}
 
