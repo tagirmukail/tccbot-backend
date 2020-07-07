@@ -51,7 +51,10 @@ strategies_g:
     retry_process_count: 5
     bb_last_candles_count: 4
     get_candles_count: 30
+    candles_filter_enable: true
+    trend_filter_enable: false
     max_filter_trend_count: 5
+    max_candles_filter_count: 4
     rsi_count: 14
     rsi_min_border: 30
     rsi_max_border: 70
@@ -68,7 +71,10 @@ strategies_g:
     retry_process_count: 5
     bb_last_candles_count: 4
     get_candles_count: 30
+    candles_filter_enable: true
+    trend_filter_enable: false
     max_filter_trend_count: 6
+    max_candles_filter_count: 4
     rsi_count: 14
     rsi_min_border: 30
     rsi_max_border: 70
@@ -84,7 +90,10 @@ strategies_g:
     retry_process_count: 5
     bb_last_candles_count: 4
     get_candles_count: 30
+    candles_filter_enable: true
+    trend_filter_enable: false
     max_filter_trend_count: 5
+    max_candles_filter_count: 4
     rsi_count: 14
     rsi_min_border: 30
     rsi_max_border: 70

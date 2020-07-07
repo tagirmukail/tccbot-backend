@@ -8,8 +8,6 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/tagirmukail/tccbot-backend/internal/strategies/filter"
-
 	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
@@ -30,8 +28,16 @@ import (
 
 const maxCandles = 100
 
-// TODO определить коэфициент и определять "на ходу" количество bb сигналов в зависимости от ситуации
-// TODO выставлять сразу и на покупку и на продажу, и при необходимости перевыставлять
+//Application version
+var (
+	Version   string
+	DateBuild string
+	GitHash   string
+)
+
+// TODO новая арбитражная стратегия - выставлять сразу и на покупку и на продажу при срабатывании сигналов, и при необходимости перевыставлять,
+//  учитывать при выставлении в какую сторону сработали сигналы, учитывать доступный балан и позицию
+
 //  atr signal/ strategy ( Awesome Oscillator + Accelerator Oscillator + Parabolic SAR)
 
 func main() {
@@ -82,6 +88,9 @@ func main() {
 	}
 	log.Info("service tccbot started...")
 
+	log.Infof("\nversion: %v;\ndate_build: %v;\ngit_hash: %v",
+		Version, DateBuild, GitHash)
+
 	cfg, err := config.ParseConfig(configPath)
 	if err != nil {
 		log.Fatal(err)
@@ -123,19 +132,15 @@ func main() {
 		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,
 	)
 
-	var filters = []filter.Filter{
-		filter.NewFilter(cfg, log),
-	}
-
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	wg := &sync.WaitGroup{}
-	strategiesType := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
-		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log, filters...),
+	strategiesTypes := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
+		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log),
 		caches,
 	)
-	strategiesType.Start()
+	strategiesTypes.Start()
 	<-done
 
 	dbManager.Close()

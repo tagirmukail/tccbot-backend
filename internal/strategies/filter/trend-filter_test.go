@@ -52,7 +52,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideBuy,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -88,7 +88,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideSell,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -123,7 +123,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -164,7 +164,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -206,7 +206,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -243,7 +243,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -274,7 +274,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -304,7 +304,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
@@ -334,7 +334,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 			},
 			want: types.SideEmpty,
 		}
-		f := NewFilter(tt.fields.cfg, tt.fields.log)
+		f := NewTrendFilter(tt.fields.cfg, tt.fields.log)
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")

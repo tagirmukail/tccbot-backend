@@ -18,7 +18,7 @@ type TrendFilter struct {
 	log         *logrus.Logger
 }
 
-func NewFilter(cfg *config.GlobalConfig, log *logrus.Logger) *TrendFilter {
+func NewTrendFilter(cfg *config.GlobalConfig, log *logrus.Logger) *TrendFilter {
 
 	return &TrendFilter{
 		cfg:         cfg,
@@ -28,33 +28,13 @@ func NewFilter(cfg *config.GlobalConfig, log *logrus.Logger) *TrendFilter {
 }
 
 func (f *TrendFilter) Apply(ctx context.Context) types.Side {
-	act := ctx.Value(stratypes.ActionKey)
-	if act == nil {
-		f.log.Debug("TrendFilter.Apply - context action is <nil>")
-		return types.SideEmpty
-	}
-	action, ok := act.(stratypes.Action)
-	if !ok {
-		f.log.Debug("TrendFilter.Apply - context action type is not <Action>")
-		return types.SideEmpty
-	}
-	if err := action.Validate(); err != nil {
-		f.log.Debugf("action validate error:%v", err)
+	ctxData, err := getFromCtx(ctx)
+	if err != nil {
+		f.log.Debugf("TrendFilter.Apply failed: %v", err)
 		return types.SideEmpty
 	}
 
-	binS := ctx.Value(stratypes.BinSizeKey)
-	if act == nil {
-		f.log.Debug("TrendFilter.Apply - context bin size is <nil>")
-		return types.SideEmpty
-	}
-	binSize, ok := binS.(models.BinSize)
-	if !ok {
-		f.log.Debug("TrendFilter.Apply - context key type is not <CtxKey>")
-		return types.SideEmpty
-	}
-
-	return f.checkAction(action, binSize)
+	return f.checkAction(ctxData.action, ctxData.binSize)
 }
 
 func (f *TrendFilter) checkAction(action stratypes.Action, size models.BinSize) types.Side {

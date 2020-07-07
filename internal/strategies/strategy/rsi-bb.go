@@ -21,6 +21,8 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
+// TODO: при выставлении ордера ставить защитный стоп ордер(good till canceled)
+
 type BBRSIStrategy struct {
 	cfg       *config.GlobalConfig
 	api       tradeapi.Api
@@ -60,6 +62,13 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
 		return errors.New("cfg by bin size is empty")
+	}
+
+	if cfg.CandlesFilterEnable && len(s.filters) == 0 {
+		s.filters = append(s.filters, filter.NewCandlesFilter(s.cfg, s.log))
+	}
+	if cfg.TrendFilterEnable && len(s.filters) == 0 {
+		s.filters = append(s.filters, filter.NewTrendFilter(s.cfg, s.log))
 	}
 
 	candles, err := s.getCandles(size)
@@ -117,8 +126,8 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 
 func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {
 	if len(s.filters) == 0 {
-		s.log.Debugf("filters is empty")
-		return types.SideEmpty
+		s.log.Warnf("no filters installed, candles filter applied")
+		s.filters = append(s.filters, filter.NewCandlesFilter(s.cfg, s.log))
 	}
 	ctx := context.WithValue(context.Background(), stratypes.ActionKey, action)
 	ctx = context.WithValue(ctx, stratypes.CandlesKey, candles)

@@ -9,8 +9,13 @@ PACKAGE=$(BINARY_NAME)
 GOPATH=$(HOME)/go
 SRC=.
 
+VERSION=$(shell git describe --tags --match 'v*' --always --abbrev=0)
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
+GITHASH=$(shell git rev-parse HEAD)
+LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.DateBuild=${BUILD_TIME}  -X main.GitHash=${GITHASH}"
+
 build:
-	@GO111MODULE=$(GO111MODULE) $(GOBUILD) -o $(SRC)/$(BINARY_NAME) -ldflags "-s -w" $(SRC)/cmd
+	@GO111MODULE=$(GO111MODULE) $(GOBUILD) -v ${LDFLAGS} -o $(SRC)/$(BINARY_NAME) $(SRC)/cmd
 
 test-unit:
 	GO111MODULE=$(GO111MODULE) $(GOTEST) ./...
