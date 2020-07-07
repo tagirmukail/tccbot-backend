@@ -91,12 +91,12 @@ func (o *OrderProcessor) processPosition() error {
 		}
 		if trademath.ConvertToBTC(position.UnrealisedPnl) >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
 			if position.OpeningQty > 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true)
+				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true, false)
 				if err != nil {
 					return err
 				}
 			} else if position.OpeningQty < 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true)
+				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true, false)
 				if err != nil {
 					return err
 				}
@@ -156,6 +156,7 @@ func (o *OrderProcessor) PlaceOrder(
 	side types.Side,
 	amount float64,
 	passive bool,
+	withStop bool,
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
@@ -182,8 +183,9 @@ func (o *OrderProcessor) PlaceOrder(
 			price = inst.BidPrice
 		}
 
+		var position *bitmex.Position
 		if amount == 0 {
-			position, err := o.getPosition()
+			position, err = o.getPosition()
 			if err != nil {
 				return nil, err
 			}
@@ -199,6 +201,9 @@ func (o *OrderProcessor) PlaceOrder(
 			if err != nil {
 				return nil, err
 			}
+		}
+		if position == nil {
+			position = &o.currentPosition
 		}
 
 		params := &bitmex.OrderNewParams{
@@ -216,10 +221,56 @@ func (o *OrderProcessor) PlaceOrder(
 		if err != nil {
 			return nil, err
 		}
+
+		if withStop {
+			err = o.placeStopOrder(params, position)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		return order, nil
 	default:
 		return nil, fmt.Errorf("unknown exchange: %s", exchange)
 	}
+}
+
+// placeStopOrder - place stop order
+// TODO: needed manual and unit or integration testing
+func (o *OrderProcessor) placeStopOrder(params *bitmex.OrderNewParams, position *bitmex.Position) error {
+	var (
+		stopPrice float64
+		stopSide  types.Side
+		offset    float64
+	)
+	if types.Side(params.Side) == types.SideBuy {
+		stopSide = types.SideSell
+		stopPrice = params.Price - 5
+		offset = -10
+	} else if types.Side(params.Side) == types.SideSell {
+		stopSide = types.SideBuy
+		stopPrice = params.Price + 5
+		offset = 10
+	}
+
+	stopParams := &bitmex.OrderNewParams{
+		Symbol:         params.Symbol,
+		StopPx:         stopPrice,
+		Price:          stopPrice,
+		OrderType:      "LimitIfTouched",
+		Side:           string(stopSide),
+		PegPriceType:   "TrailingStopPeg",
+		PegOffsetValue: offset,
+	}
+
+	o.log.Infof("create trailing stop order params: %#v", stopParams)
+	order, err := o.api.GetBitmex().CreateOrder(stopParams)
+	if err != nil {
+		return err
+	}
+	o.log.Debugf("trailing stop order placed: %#v", order)
+
+	return nil
 }
 
 func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, err error) {
