@@ -26,7 +26,7 @@ const (
 	limitMinOnOrderQty    = 100
 	liquidationPriceLimit = 1600
 
-	priceOffset    = 5
+	priceOffset    = 10
 	trailingOffset = 3
 )
 
@@ -272,6 +272,7 @@ func (o *OrderProcessor) placeStopOrder(
 		Side:           string(stopSide),
 		PegPriceType:   string(priceType),
 		PegOffsetValue: offset,
+		OrderQty:       params.OrderQty,
 	}
 
 	o.log.Infof("create trailing stop order params: %#v", stopParams)
