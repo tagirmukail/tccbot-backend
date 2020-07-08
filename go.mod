@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/go-pg/migrations/v7 v7.1.10
 	github.com/go-pg/pg/v9 v9.1.6
+	github.com/golang-migrate/migrate v3.5.4+incompatible
 	github.com/golang-migrate/migrate/v4 v4.11.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/jackc/pgx/v4 v4.6.0

@@ -3,7 +3,7 @@ GOBUILD=$(GOCMD) build
 GOTEST=$(GOCMD) test
 GOMOD=$(GOCMD) mod
 GO111MODULE=auto
-CGO_ENABLED=0
+CGO_ENABLED=1
 BINARY_NAME=tccbot-backend
 PACKAGE=$(BINARY_NAME)
 GOPATH=$(HOME)/go
@@ -15,7 +15,7 @@ GITHASH=$(shell git rev-parse HEAD)
 LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.DateBuild=${BUILD_TIME}  -X main.GitHash=${GITHASH}"
 
 build:
-	@GO111MODULE=$(GO111MODULE) $(GOBUILD) -v ${LDFLAGS} -o $(SRC)/$(BINARY_NAME) $(SRC)/cmd
+	@GO111MODULE=$(GO111MODULE) CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -v ${LDFLAGS} -o $(SRC)/$(BINARY_NAME) $(SRC)/cmd
 
 test-unit:
 	GO111MODULE=$(GO111MODULE) $(GOTEST) ./...

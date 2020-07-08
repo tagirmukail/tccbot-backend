@@ -2,17 +2,17 @@ package db
 
 import (
 	"database/sql"
+	nurl "net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
-
-	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
-
-	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
+	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
@@ -80,10 +80,17 @@ func NewDB(
 		retry: defaultRetryCount,
 	}
 	if cfg.DBPath == "" {
-		cfg.DBPath = ".tccbot_db"
+		cfg.DBPath = "sqlite3://tccbot_db?x-migrations-table=schema_migrations"
 	}
+
+	var dbfile string
 	if db == nil {
-		db, err = sqlx.Open("sqlite3", cfg.DB.DBName)
+		purl, err := nurl.Parse(cfg.DBPath)
+		if err != nil {
+			return nil, err
+		}
+		dbfile = strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite3://", "", 1)
+		db, err = sqlx.Open("sqlite3", dbfile)
 		if err != nil {
 			return nil, err
 		}

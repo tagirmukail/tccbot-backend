@@ -5,9 +5,11 @@ import (
 	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/sqlite3"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/lib/pq"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	bindata "github.com/golang-migrate/migrate/v4/source/go_bindata"
+	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/tagirmukail/tccbot-backend/migrations"
 )
 
 type Command string
@@ -19,14 +21,24 @@ const (
 )
 
 func Migrate(dbPath string, db *sql.DB, command Command, step int) error {
-	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	// driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	// if err != nil {
+	// 	return err
+	// }
+
+	s := bindata.Resource(migrations.AssetNames(), func(name string) ([]byte, error) {
+		return migrations.Asset(name)
+	})
+	d, err := bindata.WithInstance(s)
 	if err != nil {
 		return err
 	}
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", dbPath, driver)
+
+	m, err := migrate.NewWithSourceInstance("go-bindata", d, dbPath)
 	if err != nil {
 		return err
 	}
+
 	switch command {
 	case UP:
 		return m.Up()

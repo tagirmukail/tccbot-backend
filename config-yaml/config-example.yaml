@@ -103,4 +103,4 @@ strategies_g:
     macd_sig_count: 9
 
 ord_proc_period_sec: 180
-db_path: .tccbot.db
+db_path: sqlite3://tccbot_db?x-migrations-table=schema_migrations
