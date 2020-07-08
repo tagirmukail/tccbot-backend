@@ -25,6 +25,9 @@ const (
 	limitBalanceContracts = 200
 	limitMinOnOrderQty    = 100
 	liquidationPriceLimit = 1600
+
+	priceOffset    = 5
+	trailingOffset = 3
 )
 
 type OrderProcessor struct {
@@ -223,7 +226,7 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 
 		if withStop {
-			err = o.placeStopOrder(params, types.LimitIfTouched, types.TrailingStopPeg, position)
+			err = o.placeStopOrder(params, types.LimitIfTouched, types.TrailingStopPeg, position, inst)
 			if err != nil {
 				return nil, err
 			}
@@ -238,7 +241,11 @@ func (o *OrderProcessor) PlaceOrder(
 // placeStopOrder - place stop order
 // TODO: needed manual and unit or integration testing
 func (o *OrderProcessor) placeStopOrder(
-	params *bitmex.OrderNewParams, ordType types.OrderType, priceType types.PriceType, _ *bitmex.Position,
+	params *bitmex.OrderNewParams,
+	ordType types.OrderType,
+	priceType types.PriceType,
+	_ *bitmex.Position,
+	instrument bitmex.Instrument,
 ) error {
 	var (
 		stopPrice float64
@@ -247,12 +254,14 @@ func (o *OrderProcessor) placeStopOrder(
 	)
 	if types.Side(params.Side) == types.SideBuy {
 		stopSide = types.SideSell
-		stopPrice = params.Price - 5
-		offset = -10
+		stopPrice = instrument.AskPrice - priceOffset
+		offset = -1 * trailingOffset
 	} else if types.Side(params.Side) == types.SideSell {
 		stopSide = types.SideBuy
-		stopPrice = params.Price + 5
-		offset = 10
+		stopPrice = instrument.BidPrice + priceOffset
+		offset = trailingOffset
+	} else {
+		return fmt.Errorf("unknown side: %v", params.Side)
 	}
 
 	stopParams := &bitmex.OrderNewParams{
