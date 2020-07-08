@@ -1,4 +1,5 @@
 # tccbot-backend
+![Go](https://github.com/tagirmukail/tccbot-backend/workflows/Go/badge.svg?branch=master)
 
 This bot is trading cryptocurrency on bitmex exchange.
 
