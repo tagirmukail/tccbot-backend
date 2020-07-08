@@ -15,7 +15,7 @@ mkdir logs
 ./tccbot-backend -logdir logs
 ```
 
-If you need to run this bot on testnet
+If you need to run this bot on testnet, install testnet key and secret in [config-example.yaml#testnet](config-yaml/config-example.yaml#L41)
 ```bash
 ./tccbot-backend -test
 ```
