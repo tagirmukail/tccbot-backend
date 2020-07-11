@@ -88,6 +88,11 @@ func (o *OrderProcessor) processPosition() error {
 	if err != nil {
 		return err
 	}
+
+	if len(positions) == 0 {
+		o.currentPosition = bitmex.Position{}
+	}
+
 	for _, position := range positions {
 		if position.Symbol == o.cfg.ExchangesSettings.Bitmex.Symbol {
 			o.currentPosition = position
@@ -123,7 +128,22 @@ func (o *OrderProcessor) procActiveOrders() error {
 		return err
 	}
 
+	// cancel a trailing stop order if it is left alone and position is no open
+	if len(orders) == 1 && orders[0].OrdType == string(types.LimitIfTouched) && !o.currentPosition.IsOpen {
+		cancelOrd, err := o.api.GetBitmex().CancelOrders(&bitmex.OrderCancelParams{
+			OrderID: orders[0].OrderID,
+		})
+		if err != nil {
+			return err
+		}
+		o.log.Debugf("canceled %s order: %#v", cancelOrd)
+	}
+
 	for _, order := range orders {
+		if order.OrdType == string(types.LimitIfTouched) {
+			o.log.Debugf("this order is trailing stop, amend not needed, oid:%v", order.OrderID)
+			continue
+		}
 		duration := time.Now().UTC().Sub(order.Timestamp)
 		o.log.Debugf("order:%v duration: %v", order.OrderID, duration)
 		if duration > o.tickPeriod {
@@ -273,6 +293,7 @@ func (o *OrderProcessor) placeStopOrder(
 		PegPriceType:   string(priceType),
 		PegOffsetValue: offset,
 		OrderQty:       params.OrderQty,
+		ExecInst:       string(types.LastPrice),
 	}
 
 	o.log.Infof("create trailing stop order params: %#v", stopParams)

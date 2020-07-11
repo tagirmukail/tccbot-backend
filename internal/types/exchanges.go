@@ -44,6 +44,7 @@ type PriceType string
 
 const (
 	TrailingStopPeg PriceType = "TrailingStopPeg"
+	LastPrice       PriceType = "LastPrice"
 )
 
 type Theme string
