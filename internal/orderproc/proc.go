@@ -136,7 +136,7 @@ func (o *OrderProcessor) procActiveOrders() error {
 		if err != nil {
 			return err
 		}
-		o.log.Debugf("canceled %s order: %#v", cancelOrd)
+		o.log.Debugf("canceled %s order: %#v", orders[0].OrderID, cancelOrd)
 	}
 
 	for _, order := range orders {
@@ -145,7 +145,7 @@ func (o *OrderProcessor) procActiveOrders() error {
 			continue
 		}
 		duration := time.Now().UTC().Sub(order.Timestamp)
-		o.log.Debugf("order:%v duration: %v", order.OrderID, duration)
+		o.log.Debugf("process order:%v duration: %v", order.OrderID, duration)
 		if duration > o.tickPeriod {
 			inst, err := o.getPrices()
 			if err != nil {
