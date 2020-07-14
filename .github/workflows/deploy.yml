@@ -29,5 +29,5 @@ jobs:
           script: |
             cd /home/tccbot/tccbot-backend && make build-usr
             ls -lah bin
-            cd /home/tccbot/tccbot-backend && ./bin/tccbot-backend -level 5 -test -logdir logs &
+            cd /home/tccbot/tccbot-backend && ./bin/tccbot-backend -level 5 -test -logdir /home/tccbot/logs &
             sleep 5
