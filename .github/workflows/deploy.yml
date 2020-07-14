@@ -26,14 +26,7 @@ jobs:
           port: 22
           debug: true
           script: |
-            pid=$(ps aux | grep "[t]ccbot-backend" | awk '{print $2}')
-            if [ -z "$pid" ]
-            then
-              echo "tccbot-backend not runned"
-            else
-              kill $pid
-              echo "tccbot-backend stopped"
-            fi
+            /home/tccbot/tccbot-backend/scripts/stop.sh
 
       - name: run tccbot-backend
         uses: appleboy/ssh-action@master
@@ -45,6 +38,4 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            cd /home/tccbot/tccbot-backend && make build-usr
-            ./bin/tccbot-backend -config /home/tccbot/config-yaml/config-local.yaml -level 5 -test -logdir /home/tccbot/logs &
-            sleep 5
+            /home/tccbot/tccbot-backend/scripts/run.sh
