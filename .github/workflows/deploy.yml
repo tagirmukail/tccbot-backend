@@ -17,6 +17,17 @@ jobs:
           source: "."
           target: "/home/tccbot/tccbot-backend"
 
+      - name: stop tccbot-backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWD }}
+          port: 22
+          debug: true
+          script: |
+            pkill -f tccbot-backend || true
+
       - name: run tccbot-backend
         uses: appleboy/ssh-action@master
         with:
@@ -27,7 +38,6 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            pkill -f tccbot-backend || true
             cd /home/tccbot/tccbot-backend && make build-usr
             ./bin/tccbot-backend -config /home/tccbot/config-yaml/config-local.yaml -level 5 -test -logdir /home/tccbot/logs &
             sleep 5
