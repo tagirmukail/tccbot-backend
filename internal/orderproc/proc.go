@@ -416,6 +416,7 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 	return
 }
 
+//
 func (o *OrderProcessor) checkLiquidation(position *bitmex.Position, price float64, side types.Side) error {
 	liquidationDiff := math.Abs(position.LiquidationPrice - price)
 	isLiquidationWarn := liquidationDiff < liquidationPriceLimit
