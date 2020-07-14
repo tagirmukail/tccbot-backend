@@ -24,8 +24,9 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWD }}
           port: 22
+          debug: true
           script_stop: true
           script: |
-            cd /home/tccbot/tccbot-backend
-            make build
+            go version
+            cd /home/tccbot/tccbot-backend && make build
             ./bin/tccbot-backend -level 5 -test -logdir logs &
