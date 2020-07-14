@@ -17,16 +17,16 @@ jobs:
           source: "."
           target: "/home/tccbot/tccbot-backend"
 
-      - name: stop tccbot-backend
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWD }}
-          port: 22
-          debug: true
-          script: |
-            /home/tccbot/tccbot-backend/scripts/stop.sh
+      # - name: stop tccbot-backend
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.HOST }}
+      #     username: ${{ secrets.USERNAME }}
+      #     password: ${{ secrets.PASSWD }}
+      #     port: 22
+      #     debug: true
+      #     script: |
+      #       /home/tccbot/tccbot-backend/scripts/stop.sh
 
       - name: run tccbot-backend
         uses: appleboy/ssh-action@master

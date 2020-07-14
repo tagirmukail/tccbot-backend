@@ -2,9 +2,12 @@ package main
 
 import (
 	"flag"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"runtime/pprof"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 
@@ -26,7 +29,10 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex/ws"
 )
 
-const maxCandles = 100
+const (
+	maxCandles = 100
+	PidEnvKey  = "TCCBOTBACKENDPID"
+)
 
 //Application version
 var (
@@ -67,6 +73,16 @@ func main() {
 	flag.StringVar(&logDir, "logdir", "", "logs save directory")
 	flag.BoolVar(&initSignals, "siginit", false, "initialization previous signals.By default disabled")
 	flag.Parse()
+
+	err := killIfRun()
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	err = setPidEnv()
+	if err != nil {
+		logrus.Fatal(err)
+	}
 
 	if prof != "" {
 		f, err := os.Create(prof)
@@ -145,4 +161,51 @@ func main() {
 
 	dbManager.Close()
 	log.Infof("service tccbot stopped")
+}
+
+func setPidEnv() error {
+	pid := strconv.Itoa(os.Getpid())
+
+	err := ioutil.WriteFile(PidEnvKey, []byte(pid), 0666)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("started service pid: %v", pid)
+	return nil
+}
+
+func killIfRun() error {
+	f, err := os.OpenFile(PidEnvKey, os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+
+	pid, err := ioutil.ReadAll(f)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
+	if len(pid) == 0 {
+		logrus.Infof("service  not runned")
+		return nil
+	}
+
+	pidNumb, err := strconv.Atoi(string(pid))
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("service stopped, pid: %v", pidNumb)
+
+	err = syscall.Kill(pidNumb, syscall.SIGTERM)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such process") {
+			return nil
+		}
+		return err
+	}
+
+	return nil
 }

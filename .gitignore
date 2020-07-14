@@ -19,3 +19,4 @@ config-yaml/config-local.yaml
 tccbot-backend
 tccbot_db
 tccbot.db
+TCCBOTBACKENDPID
