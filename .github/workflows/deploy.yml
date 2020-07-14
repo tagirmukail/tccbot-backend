@@ -6,6 +6,26 @@ jobs:
     name: deploy
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.14
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+          if [ -f Gopkg.toml ]; then
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+              dep ensure
+          fi
+
+      - name: Build
+        run: make build
+
       - uses: actions/checkout@master
       - name: scp all files
         uses: appleboy/scp-action@master
@@ -27,15 +47,5 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            GOVERSION=$(go version)
-
-            if  [ -z "$GOVERSION" ]
-            then
-              wget https://golang.org/dl/go1.14.5.linux-amd64.tar.gz
-              tar -C /usr/local -xzf go1.14.5.linux-amd64.tar.gz
-            else
-              echo "$GOVERSION"
-            fi
-
             cd /home/tccbot/tccbot-backend && make build
             ./bin/tccbot-backend -level 5 -test -logdir logs &
