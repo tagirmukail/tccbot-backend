@@ -1,5 +1,7 @@
 GOCMD=go
+GOCMDUSR=/usr/local/go/bin/go
 GOBUILD=$(GOCMD) build
+GOBUILDUSR=$(GOCMDUSR) build
 GOTEST=$(GOCMD) test
 GOMOD=$(GOCMD) mod
 GO111MODULE=auto
@@ -16,6 +18,9 @@ LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.DateBuild=${BUILD_TIM
 
 build:
 	@GO111MODULE=$(GO111MODULE) CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -v ${LDFLAGS} -o $(SRC)/bin/$(BINARY_NAME) $(SRC)/cmd
+
+build-usr:
+	@GO111MODULE=$(GO111MODULE) CGO_ENABLED=$(CGO_ENABLED) $(GOBUILDUSR) -v ${LDFLAGS} -o $(SRC)/bin/$(BINARY_NAME) $(SRC)/cmd
 
 test-unit:
 	GO111MODULE=$(GO111MODULE) $(GOTEST) ./...
