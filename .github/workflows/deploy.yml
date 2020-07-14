@@ -36,7 +36,6 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWD }}
           port: 22
-          script_stop: true
           script: |
             pkill -f tccbot-backend
 
@@ -60,4 +59,4 @@ jobs:
           port: 22
           script_stop: true
           script: |
-            ./tccbot-backend -level 5 -test &
+            ./tccbot-backend -level 5 -test -logdir logs &
