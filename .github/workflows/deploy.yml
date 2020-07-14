@@ -29,15 +29,15 @@ jobs:
       - name: test
         run: make test-unit
 
-      - name: stop tccbot-backend
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWD }}
-          port: 22
-          script: |
-            pkill -f tccbot-backend
+      # - name: stop tccbot-backend
+      #   uses: appleboy/ssh-action@master
+      #   with:
+      #     host: ${{ secrets.HOST }}
+      #     username: ${{ secrets.USERNAME }}
+      #     password: ${{ secrets.PASSWD }}
+      #     port: 22
+      #     script: |
+      #       pkill -f tccbot-backend
 
       - uses: actions/checkout@master
       - name: scp bin file
