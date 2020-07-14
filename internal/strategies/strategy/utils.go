@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -88,9 +89,9 @@ func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([
 }
 
 func placeBitmexOrder(
-	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
+	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger, maxPrice, minPrice float64,
 ) error {
-	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive, true)
+	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive, true, maxPrice, minPrice)
 	if err != nil {
 		log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err
@@ -98,4 +99,21 @@ func placeBitmexOrder(
 
 	log.Infof("%s order placed: %#v", side, ord)
 	return nil
+}
+
+func findMaxAndMin(candles []bitmex.TradeBuck) (float64, float64) {
+	var (
+		max float64
+		min float64 = math.MaxFloat64
+	)
+	closes := fetchCloses(candles)
+	for _, closeP := range closes {
+		if closeP > max {
+			max = closeP
+		}
+		if closeP < min {
+			min = closeP
+		}
+	}
+	return max, min
 }

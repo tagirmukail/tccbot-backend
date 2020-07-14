@@ -26,8 +26,7 @@ const (
 	limitMinOnOrderQty    = 100
 	liquidationPriceLimit = 1600
 
-	priceOffset    = 10
-	trailingOffset = 3
+	trailingOffset = 5
 )
 
 type OrderProcessor struct {
@@ -99,12 +98,12 @@ func (o *OrderProcessor) processPosition() error {
 		}
 		if trademath.ConvertToBTC(position.UnrealisedPnl) >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
 			if position.OpeningQty > 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true, false)
+				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true, false, 0, 0)
 				if err != nil {
 					return err
 				}
 			} else if position.OpeningQty < 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true, false)
+				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true, false, 0, 0)
 				if err != nil {
 					return err
 				}
@@ -147,7 +146,7 @@ func (o *OrderProcessor) procActiveOrders() error {
 		duration := time.Now().UTC().Sub(order.Timestamp)
 		o.log.Debugf("process order:%v duration: %v", order.OrderID, duration)
 		if duration > o.tickPeriod {
-			inst, err := o.getPrices()
+			inst, err := o.getInstrument()
 			if err != nil {
 				return err
 			}
@@ -180,6 +179,8 @@ func (o *OrderProcessor) PlaceOrder(
 	amount float64,
 	passive bool,
 	withStop bool,
+	maxPrice,
+	minPrice float64,
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
@@ -195,7 +196,7 @@ func (o *OrderProcessor) PlaceOrder(
 		if err != nil {
 			return nil, err
 		}
-		inst, err := o.getPrices()
+		inst, err := o.getInstrument()
 		if err != nil {
 			return nil, err
 		}
@@ -246,7 +247,13 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 
 		if withStop {
-			err = o.placeStopOrder(params, types.LimitIfTouched, types.TrailingStopPeg, position, inst)
+			err = o.placeStopOrder(
+				order.OrderID,
+				params,
+				types.LimitIfTouched,
+				types.TrailingStopPeg,
+				maxPrice,
+				minPrice)
 			if err != nil {
 				return nil, err
 			}
@@ -261,11 +268,12 @@ func (o *OrderProcessor) PlaceOrder(
 // placeStopOrder - place stop order
 // TODO: needed manual and unit or integration testing
 func (o *OrderProcessor) placeStopOrder(
+	clOrdID string,
 	params *bitmex.OrderNewParams,
 	ordType types.OrderType,
 	priceType types.PriceType,
-	_ *bitmex.Position,
-	instrument bitmex.Instrument,
+	maxPrice,
+	minPrice float64,
 ) error {
 	var (
 		stopPrice float64
@@ -274,17 +282,18 @@ func (o *OrderProcessor) placeStopOrder(
 	)
 	if types.Side(params.Side) == types.SideBuy {
 		stopSide = types.SideSell
-		stopPrice = instrument.AskPrice - priceOffset
+		stopPrice = minPrice
 		offset = -1 * trailingOffset
 	} else if types.Side(params.Side) == types.SideSell {
 		stopSide = types.SideBuy
-		stopPrice = instrument.BidPrice + priceOffset
+		stopPrice = maxPrice
 		offset = trailingOffset
 	} else {
 		return fmt.Errorf("unknown side: %v", params.Side)
 	}
 
 	stopParams := &bitmex.OrderNewParams{
+		ClientOrderID:  clOrdID,
 		Symbol:         params.Symbol,
 		StopPx:         stopPrice,
 		Price:          stopPrice,
@@ -325,7 +334,7 @@ func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, 
 	return 0, 0, fmt.Errorf("user margin by currency:%s not exist", o.cfg.ExchangesSettings.Bitmex.Currency)
 }
 
-func (o *OrderProcessor) getPrices() (bitmex.Instrument, error) {
+func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
 	var resp bitmex.Instrument
 	insts, err := o.api.GetBitmex().GetInstrument(bitmex.InstrumentRequestParams{
 		Symbol:  o.cfg.ExchangesSettings.Bitmex.Symbol,

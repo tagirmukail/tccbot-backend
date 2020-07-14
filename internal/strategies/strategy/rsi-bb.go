@@ -113,12 +113,14 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action = s.processTrend(size, lastCandles, lastSignals)
 	}
 
+	max, min := findMaxAndMin(candles)
+
 	applySide := s.ApplyFilters(action, candles, size)
 	switch applySide {
 	case types.SideSell:
-		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log)
+		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log, max, min)
 	case types.SideBuy:
-		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log)
+		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log, max, min)
 	default:
 		return nil
 	}

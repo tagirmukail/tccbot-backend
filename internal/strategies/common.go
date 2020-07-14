@@ -112,7 +112,7 @@ func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalT
 
 	amount := utils.RandomRange(limitMinOnOrderQty, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
 
-	ord, err := s.orderProc.PlaceOrder(types.Bitmex, side, amount, false, false)
+	ord, err := s.orderProc.PlaceOrder(types.Bitmex, side, amount, false, false, 0, 0)
 	if err != nil {
 		s.log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err
