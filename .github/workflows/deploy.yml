@@ -27,6 +27,15 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            go version
+            GOVERSION=$(go version)
+
+            if  [ -z "$GOVERSION" ]
+            then
+              wget https://golang.org/dl/go1.14.5.linux-amd64.tar.gz
+              tar -C /usr/local -xzf go1.14.5.linux-amd64.tar.gz
+            else
+              echo "$GOVERSION"
+            fi
+
             cd /home/tccbot/tccbot-backend && make build
             ./bin/tccbot-backend -level 5 -test -logdir logs &
