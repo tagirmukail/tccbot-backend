@@ -47,7 +47,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWD }}
           port: 22
-          source: "tccbot-backend"
+          source: "/"
           target: "/home/tccbot"
 
       - name: run tccbot-backend
