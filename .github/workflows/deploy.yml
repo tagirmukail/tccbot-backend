@@ -27,6 +27,6 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            ls -lah /usr/local/go/bin
             cd /home/tccbot/tccbot-backend && make build-usr
-            ./bin/tccbot-backend -level 5 -test -logdir logs &
+            ls -lah bin
+            cd /home/tccbot/tccbot-backend && ./bin/tccbot-backend -level 5 -test -logdir logs &
