@@ -1,0 +1,63 @@
+name: deploy
+on: [push]
+jobs:
+
+  build:
+    name: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.14
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+          if [ -f Gopkg.toml ]; then
+              curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+              dep ensure
+          fi
+
+      - name: build tccbot-backend bin file
+        run: make build
+
+      - name: test
+        run: make test-unit
+
+      - name: stop tccbot-backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWD }}
+          port: 22
+          script_stop: true
+          script: |
+            pkill -f tccbot-backend
+
+      - uses: actions/checkout@master
+      - name: scp bin file
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWD }}
+          port: 22
+          source: "tccbot-backend"
+          target: "/home/tccbot"
+
+      - name: run tccbot-backend
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWD }}
+          port: 22
+          script_stop: true
+          script: |
+            ./tccbot-backend -level 5 -test &
