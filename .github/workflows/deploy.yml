@@ -30,3 +30,4 @@ jobs:
             cd /home/tccbot/tccbot-backend && make build-usr
             ls -lah bin
             cd /home/tccbot/tccbot-backend && ./bin/tccbot-backend -level 5 -test -logdir logs &
+            sleep 5
