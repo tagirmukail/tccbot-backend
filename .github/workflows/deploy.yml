@@ -27,7 +27,7 @@ jobs:
           debug: true
           script_stop: true
           script: |
-            pkill -f tccbot-backend
+            pkill -f tccbot-backend || true
             cd /home/tccbot/tccbot-backend && make build-usr
             ./bin/tccbot-backend -config /home/tccbot/config-yaml/config-local.yaml -level 5 -test -logdir /home/tccbot/logs &
             sleep 5
