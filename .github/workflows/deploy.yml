@@ -28,5 +28,5 @@ jobs:
           script_stop: true
           script: |
             cd /home/tccbot/tccbot-backend && make build-usr
-            cd /home/tccbot/tccbot-backend && ./bin/tccbot-backend -config /home/tccbot/config-yaml/config-local.yaml -level 5 -test -logdir /home/tccbot/logs
+            ./bin/tccbot-backend -config /home/tccbot/config-yaml/config-local.yaml -level 5 -test -logdir /home/tccbot/logs &
             sleep 5
