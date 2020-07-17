@@ -128,8 +128,15 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 
 func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {
 	if len(s.filters) == 0 {
-		s.log.Warnf("no filters installed, candles filter applied")
-		s.filters = append(s.filters, filter.NewCandlesFilter(s.cfg, s.log))
+		s.log.Warnf("filters not installed")
+		switch action {
+		case stratypes.UpTrend:
+			return types.SideSell
+		case stratypes.DownTrend:
+			return types.SideBuy
+		default:
+			return types.SideEmpty
+		}
 	}
 	ctx := context.WithValue(context.Background(), stratypes.ActionKey, action)
 	ctx = context.WithValue(ctx, stratypes.CandlesKey, candles)
