@@ -124,11 +124,15 @@ func main() {
 
 	var themes = cfg.GlobStrategies.GetThemes()
 
+	bitmexKey, bitmexSecret := cfg.Accesses.Bitmex.Key, cfg.Accesses.Bitmex.Secret
+	if testMode {
+		bitmexKey, bitmexSecret = cfg.Accesses.Bitmex.Testnet.Key, cfg.Accesses.Bitmex.Testnet.Secret
+
+	}
+
 	tradeApi := tradeapi.NewTradeApi(
-		cfg.Accesses.Bitmex.Key,
-		cfg.Accesses.Bitmex.Secret,
-		cfg.Accesses.Bitmex.Testnet.Key,
-		cfg.Accesses.Bitmex.Testnet.Secret,
+		bitmexKey,
+		bitmexSecret,
 		log,
 		testMode,
 		ws.NewWS(
@@ -139,6 +143,18 @@ func main() {
 			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
 			themes,
 			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
+			bitmexKey, bitmexSecret,
+		),
+		ws.NewWS(
+			log,
+			testMode,
+			cfg.ExchangesSettings.Bitmex.PingSec,
+			cfg.ExchangesSettings.Bitmex.TimeoutSec,
+			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
+			[]types.Theme{types.Position},
+			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
+			bitmexKey,
+			bitmexSecret,
 		),
 	)
 

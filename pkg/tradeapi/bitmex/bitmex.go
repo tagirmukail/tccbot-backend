@@ -35,6 +35,7 @@ type Bitmex struct {
 	timeout          time.Duration
 	rwLock           sync.RWMutex
 	ws               *ws.WS
+	authWS           *ws.WS
 }
 
 type Request struct {
@@ -58,6 +59,7 @@ func New(
 	maxRequestsLimit int32,
 	timeout time.Duration,
 	ws *ws.WS,
+	authWS *ws.WS,
 	logger *logrus.Logger,
 ) *Bitmex {
 	if maxRequestsLimit == 0 {
@@ -76,6 +78,7 @@ func New(
 		timeout:          timeout,
 		rwLock:           sync.RWMutex{},
 		ws:               ws,
+		authWS:           authWS,
 	}
 }
 
@@ -85,6 +88,10 @@ func (b *Bitmex) EnableTestNet() {
 
 func (b *Bitmex) GetWS() *ws.WS {
 	return b.ws
+}
+
+func (b *Bitmex) GetAuthWS() *ws.WS {
+	return b.authWS
 }
 
 func (b *Bitmex) SetDefaultUserAgent(agent string) {

@@ -4,10 +4,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/crypto"
 
 	"github.com/gorilla/websocket"
 	jsoniter "github.com/json-iterator/go"
@@ -41,6 +44,9 @@ type WS struct {
 	theme    []types.Theme
 	symbol   types.Symbol
 	messages chan *data.BitmexData
+
+	apiKey    string
+	apiSecret string
 }
 
 func NewWS(
@@ -51,6 +57,8 @@ func NewWS(
 	retrySec uint32,
 	theme []types.Theme,
 	symbol types.Symbol,
+	apiKey string,
+	apiSecret string,
 ) *WS {
 	var bitmexUrl string
 	if test {
@@ -74,9 +82,14 @@ func NewWS(
 		theme:        theme,
 		symbol:       symbol,
 		messages:     make(chan *data.BitmexData),
+		apiKey:       apiKey,
+		apiSecret:    apiSecret,
 	}
 
 	wsr.ws.SubscribeHandler = wsr.subscribeHandler
+	if apiSecret != "" && apiKey != "" {
+		wsr.ws.SubscribeHandler = wsr.subscribeAuthHandler
+	}
 
 	return wsr
 }
@@ -174,28 +187,64 @@ func (r *WS) read(wg *sync.WaitGroup) {
 
 }
 
-// subscribeHandler fires after the connection successfully establish and subscribed on ws messages by theme
 func (r *WS) subscribeHandler() error {
+	return r.subscribe(false)
+}
+
+func (r *WS) subscribeAuthHandler() error {
+	j := jsoniter.ConfigCompatibleWithStandardLibrary
+
+	timestamp := time.Now().Add(time.Second * 10).UnixNano()
+	timestampStr := strconv.FormatInt(timestamp, 10)
+	timestampNew := timestampStr[:13]
+
+	hmac := crypto.GetHashMessage(crypto.HashSHA256,
+		[]byte("GET"+"/realtime"+timestampNew+""),
+		[]byte(r.apiSecret))
+
+	authMsg := types.NewAuthMsg(r.apiKey, crypto.HexEncodeToString(hmac), timestampNew)
+	bData, err := j.Marshal(authMsg)
+	if err != nil {
+		r.log.Errorf("WS.subscribeAuthHandler() marshal error: %v", err)
+		return err
+	}
+	err = r.ws.WriteMessage(websocket.TextMessage, bData)
+	if err != nil {
+		r.log.Errorf("WS.subscribeAuthHandler() websocket write msg error: %v", err)
+		r.log.Errorf("WS.subscribeAuthHandler() websocket write msg data: %#v", authMsg)
+		return err
+	}
+
+	return r.subscribe(true)
+}
+
+// subscribeHandler fires after the connection successfully establish and subscribed on ws messages by theme
+func (r *WS) subscribe(auth bool) error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
 	var themes []types.Theme
-	for _, theme := range r.theme {
-		themes = append(themes, types.NewTemeWithPair(theme, r.symbol))
+	if !auth {
+		for _, theme := range r.theme {
+			themes = append(themes, types.NewTemeWithPair(theme, r.symbol))
+		}
+	} else {
+		themes = r.theme
 	}
+
 	subsMsg := types.NewSubscribeMsg(
 		types.SubscribeAct,
 		themes,
 	)
 	data, err := j.Marshal(subsMsg)
 	if err != nil {
-		r.log.Errorf("WS.Start() marshal error: %v", err)
+		r.log.Errorf("WS.subscribe() marshal error: %v", err)
 		return err
 	}
 
 	err = r.ws.WriteMessage(websocket.TextMessage, data)
 	if err != nil {
-		r.log.Errorf("WS.Start() websocket write msg error: %v", err)
-		r.log.Errorf("WS.Start() websocket write msg data: %#v", subsMsg)
+		r.log.Errorf("WS.subscribe() websocket write msg error: %v", err)
+		r.log.Errorf("WS.subscribe() websocket write msg data: %#v", subsMsg)
 		return err
 	}
 

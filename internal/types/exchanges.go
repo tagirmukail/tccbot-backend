@@ -44,13 +44,20 @@ type PriceType string
 
 const (
 	TrailingStopPeg PriceType = "TrailingStopPeg"
-	LastPrice       PriceType = "LastPrice"
+)
+
+type ExecInstType string
+
+const (
+	LastPriceExecInstType    ExecInstType = "LastPrice"
+	PassiveOrderExecInstType ExecInstType = "ParticipateDoNotInitiate"
 )
 
 type Theme string
 
 const (
 	Instrument Theme = "instrument"
+	Position   Theme = "position"
 	Trade      Theme = "trade"
 	TradeBin1m Theme = "tradeBin1m"
 	TradeBin5m Theme = "tradeBin5m"
@@ -78,5 +85,17 @@ func NewSubscribeMsg(op Operation, args []Theme) *SubscribeMsg {
 	return &SubscribeMsg{
 		Op:   op,
 		Args: args,
+	}
+}
+
+type AuthMsg struct {
+	Op   Operation     `json:"op"` // operation
+	Args []interface{} `json:"args"`
+}
+
+func NewAuthMsg(apiKey, signature string, expires string) *AuthMsg {
+	return &AuthMsg{
+		Op:   "authKeyExpires",
+		Args: []interface{}{apiKey, expires, signature},
 	}
 }

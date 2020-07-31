@@ -82,6 +82,9 @@ func (s *Strategies) start() {
 	s.wgRunner.Add(1)
 	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
 
+	s.wgRunner.Add(1)
+	go s.tradeApi.GetBitmex().GetAuthWS().Start(s.wgRunner)
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 

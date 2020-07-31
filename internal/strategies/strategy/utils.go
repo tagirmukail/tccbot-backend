@@ -89,9 +89,9 @@ func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([
 }
 
 func placeBitmexOrder(
-	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger, maxPrice, minPrice float64,
+	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
 ) error {
-	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive, true, maxPrice, minPrice)
+	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive, true)
 	if err != nil {
 		log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err
@@ -104,7 +104,7 @@ func placeBitmexOrder(
 func findMaxAndMin(candles []bitmex.TradeBuck) (float64, float64) {
 	var (
 		max float64
-		min float64 = math.MaxFloat64
+		min = math.MaxFloat64
 	)
 	closes := fetchCloses(candles)
 	for _, closeP := range closes {

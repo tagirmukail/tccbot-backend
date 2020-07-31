@@ -21,8 +21,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-// TODO: при выставлении ордера ставить защитный стоп ордер(good till canceled)
-
 type BBRSIStrategy struct {
 	cfg       *config.GlobalConfig
 	api       tradeapi.Api
@@ -113,14 +111,12 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action = s.processTrend(size, lastCandles, lastSignals)
 	}
 
-	max, min := findMaxAndMin(candles)
-
 	applySide := s.ApplyFilters(action, candles, size)
 	switch applySide {
 	case types.SideSell:
-		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log, max, min)
+		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log)
 	case types.SideBuy:
-		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log, max, min)
+		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log)
 	default:
 		return nil
 	}
