@@ -40,7 +40,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 			},
 			args: args{
 				position: &bitmex.Position{
-					OpeningQty:    345,
+					CurrentQty:    345,
 					UnrealisedPnl: 163,
 				},
 				balance: 0.0090,

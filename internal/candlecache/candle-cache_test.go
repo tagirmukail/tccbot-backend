@@ -165,8 +165,10 @@ func TestCandleCache_Store(t *testing.T) {
 			},
 			args: args{
 				candle: data.BitmexIncomingData{
-					Symbol:    types.XBTUSD,
-					Close:     456,
+					Symbol: types.XBTUSD,
+					TradeBinData: data.TradeBinData{
+						Close: 456,
+					},
 					Timestamp: "2020-05-16T10:45:00.000Z",
 				},
 			},
@@ -214,8 +216,10 @@ func TestCandleCache_Store(t *testing.T) {
 			},
 			args: args{
 				candle: data.BitmexIncomingData{
-					Symbol:    types.Symbol("BTC"),
-					Close:     456,
+					Symbol: types.Symbol("BTC"),
+					TradeBinData: data.TradeBinData{
+						Close: 456,
+					},
 					Timestamp: "2020-05-16T10:45:00.000Z",
 				},
 			},
