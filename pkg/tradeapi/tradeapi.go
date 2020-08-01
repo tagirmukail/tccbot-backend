@@ -24,7 +24,6 @@ type Api interface {
 type BitmexApi interface {
 	EnableTestNet()
 	GetWS() *ws.WS
-	GetAuthWS() *ws.WS
 
 	// Bitmex
 	SetDefaultUserAgent(agent string)
@@ -54,7 +53,6 @@ func NewTradeApi(
 	log *logrus.Logger,
 	test bool,
 	ws *ws.WS,
-	authWS *ws.WS,
 ) *TradeApi {
 	tapi := &TradeApi{
 		bitmex: bitmex.New(
@@ -67,7 +65,6 @@ func NewTradeApi(
 			0,
 			0,
 			ws,
-			authWS,
 			log,
 		),
 	}

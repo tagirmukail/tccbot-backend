@@ -11,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 
+	bitmextradedata "github.com/tagirmukail/tccbot-backend/internal/tradedata/bitmex"
+
 	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
@@ -122,7 +124,7 @@ func main() {
 		return
 	}
 
-	var themes = cfg.GlobStrategies.GetThemes()
+	var tradeThemes = cfg.GlobStrategies.GetThemes()
 
 	bitmexKey, bitmexSecret := cfg.Accesses.Bitmex.Key, cfg.Accesses.Bitmex.Secret
 	if testMode {
@@ -141,24 +143,15 @@ func main() {
 			cfg.ExchangesSettings.Bitmex.PingSec,
 			cfg.ExchangesSettings.Bitmex.TimeoutSec,
 			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
-			themes,
-			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
-			bitmexKey, bitmexSecret,
-		),
-		ws.NewWS(
-			log,
-			testMode,
-			cfg.ExchangesSettings.Bitmex.PingSec,
-			cfg.ExchangesSettings.Bitmex.TimeoutSec,
-			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
-			[]types.Theme{types.Position},
+			append([]types.Theme{types.Position}, tradeThemes...),
 			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
 			bitmexKey,
 			bitmexSecret,
 		),
 	)
 
-	ordProc := orderproc.New(tradeApi, cfg, log)
+	bitmexSubsForOrderProc := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
+	ordProc := orderproc.New(tradeApi, cfg, bitmexSubsForOrderProc, log)
 
 	caches := candlecache.NewBinToCache(
 		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,
@@ -167,11 +160,14 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
+	bitmexSubsTradeForStrategies := bitmextradedata.NewSubscriber(tradeThemes)
+
+	bitmexDataSender := bitmextradedata.New(tradeApi.GetBitmex().GetWS().GetMessages(), log,
+		bitmexSubsTradeForStrategies, bitmexSubsForOrderProc)
+
 	wg := &sync.WaitGroup{}
-	strategiesTypes := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
-		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log),
-		caches,
-	)
+	strategiesTypes := strategies.New(wg, cfg, tradeApi, ordProc, bitmexDataSender, bitmexSubsTradeForStrategies,
+		dbManager, log, initSignals, strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log), caches)
 	strategiesTypes.Start()
 	<-done
 

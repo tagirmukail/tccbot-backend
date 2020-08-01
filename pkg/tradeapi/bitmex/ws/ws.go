@@ -76,7 +76,7 @@ func NewWS(
 			NonVerbose:       true,
 			HandshakeTimeout: handshakeTimeout,
 		},
-		connUrl:      bitmexUrl + "?" + buildSubscribeParams(symbol, theme),
+		connUrl:      bitmexUrl,
 		pingInterval: ping,
 		timeout:      timeout,
 		theme:        theme,
@@ -86,10 +86,8 @@ func NewWS(
 		apiSecret:    apiSecret,
 	}
 
-	wsr.ws.SubscribeHandler = wsr.subscribeHandler
-	if apiSecret != "" && apiKey != "" {
-		wsr.ws.SubscribeHandler = wsr.subscribeAuthHandler
-	}
+	wsr.connUrl = bitmexUrl
+	wsr.ws.SubscribeHandler = wsr.subscribeAuthHandler
 
 	return wsr
 }
@@ -188,21 +186,20 @@ func (r *WS) read(wg *sync.WaitGroup) {
 }
 
 func (r *WS) subscribeHandler() error {
-	return r.subscribe(false)
+	return r.subscribe()
 }
 
 func (r *WS) subscribeAuthHandler() error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
-	timestamp := time.Now().Add(time.Second * 10).UnixNano()
-	timestampStr := strconv.FormatInt(timestamp, 10)
-	timestampNew := timestampStr[:13]
+	timestamp := time.Now().Add(time.Hour * 1).Unix()
+	timestampNew := strconv.FormatInt(timestamp, 10)
 
 	hmac := crypto.GetHashMessage(crypto.HashSHA256,
-		[]byte("GET"+"/realtime"+timestampNew+""),
+		[]byte("GET/realtime"+timestampNew),
 		[]byte(r.apiSecret))
 
-	authMsg := types.NewAuthMsg(r.apiKey, crypto.HexEncodeToString(hmac), timestampNew)
+	authMsg := types.NewAuthMsg(r.apiKey, crypto.HexEncodeToString(hmac), timestamp)
 	bData, err := j.Marshal(authMsg)
 	if err != nil {
 		r.log.Errorf("WS.subscribeAuthHandler() marshal error: %v", err)
@@ -210,25 +207,23 @@ func (r *WS) subscribeAuthHandler() error {
 	}
 	err = r.ws.WriteMessage(websocket.TextMessage, bData)
 	if err != nil {
-		r.log.Errorf("WS.subscribeAuthHandler() websocket write msg error: %v", err)
-		r.log.Errorf("WS.subscribeAuthHandler() websocket write msg data: %#v", authMsg)
+		r.log.Errorf("WS.subscribeAuthHandler() websocket write [msg]:%#v error: %v", authMsg, err)
 		return err
 	}
 
-	return r.subscribe(true)
+	return r.subscribe()
 }
 
 // subscribeHandler fires after the connection successfully establish and subscribed on ws messages by theme
-func (r *WS) subscribe(auth bool) error {
+func (r *WS) subscribe() error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
 	var themes []types.Theme
-	if !auth {
-		for _, theme := range r.theme {
-			themes = append(themes, types.NewTemeWithPair(theme, r.symbol))
+	for _, theme := range r.theme {
+		if strings.Contains(string(theme), string(types.Trade)) {
+			theme = types.NewTemeWithPair(theme, r.symbol)
 		}
-	} else {
-		themes = r.theme
+		themes = append(themes, theme)
 	}
 
 	subsMsg := types.NewSubscribeMsg(

@@ -112,14 +112,11 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	}
 
 	applySide := s.ApplyFilters(action, candles, size)
-	switch applySide {
-	case types.SideSell:
-		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log)
-	case types.SideBuy:
-		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log)
-	default:
+	if applySide != types.SideBuy && applySide != types.SideSell {
 		return nil
 	}
+
+	return placeBitmexOrder(s.orderProc, applySide, false, s.log)
 }
 
 func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {

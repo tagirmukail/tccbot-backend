@@ -27,6 +27,7 @@ const (
 	Limit           OrderType = "Limit"
 	Market          OrderType = "Market"
 	StopLimit       OrderType = "StopLimit"
+	Stop            OrderType = "Stop"
 	LimitIfTouched  OrderType = "LimitIfTouched"
 	MarketIfTouched OrderType = "MarketIfTouched"
 )
@@ -59,6 +60,8 @@ const (
 	Instrument Theme = "instrument"
 	Position   Theme = "position"
 	Trade      Theme = "trade"
+	Order      Theme = "order"
+	Margin     Theme = "margin"
 	TradeBin1m Theme = "tradeBin1m"
 	TradeBin5m Theme = "tradeBin5m"
 	TradeBin1h Theme = "tradeBin1h"
@@ -93,7 +96,7 @@ type AuthMsg struct {
 	Args []interface{} `json:"args"`
 }
 
-func NewAuthMsg(apiKey, signature string, expires string) *AuthMsg {
+func NewAuthMsg(apiKey, signature string, expires interface{}) *AuthMsg {
 	return &AuthMsg{
 		Op:   "authKeyExpires",
 		Args: []interface{}{apiKey, expires, signature},

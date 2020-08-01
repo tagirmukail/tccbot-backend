@@ -299,8 +299,8 @@ func RemoveEmptyValues(indexes []float64, vals []float64) ([]float64, []float64)
 	return indxesResult, result
 }
 
-func ConvertToBTC(balance int64) float64 {
-	return float64(balance) / SatoshisPerBTC
+func ConvertToBTC(b int64) float64 {
+	return float64(b) / SatoshisPerBTC
 }
 
 func ConvertFromBTCToContracts(balance float64) float64 {
