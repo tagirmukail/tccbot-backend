@@ -80,8 +80,8 @@ func (s *Strategies) Start() {
 	}
 	s.wgRunner.Add(1)
 	go s.start()
-	s.wgRunner.Add(1)
-	go s.orderProc.Start(s.wgRunner)
+	//s.wgRunner.Add(1)
+	//go s.orderProc.Start(s.wgRunner)
 	s.wgRunner.Add(1)
 	go s.bitmexDataSender.SendToSubscribers(s.wgRunner)
 	s.wgRunner.Wait()

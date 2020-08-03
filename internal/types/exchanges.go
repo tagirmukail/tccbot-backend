@@ -50,6 +50,7 @@ const (
 type ExecInstType string
 
 const (
+	MarkPriceExecInstType    ExecInstType = "MarkPrice"
 	LastPriceExecInstType    ExecInstType = "LastPrice"
 	PassiveOrderExecInstType ExecInstType = "ParticipateDoNotInitiate"
 )
