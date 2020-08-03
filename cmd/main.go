@@ -11,6 +11,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
+
 	bitmextradedata "github.com/tagirmukail/tccbot-backend/internal/tradedata/bitmex"
 
 	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
@@ -48,6 +50,8 @@ var (
 
 //  atr signal/ strategy ( Awesome Oscillator + Accelerator Oscillator + Parabolic SAR)
 
+// TODO попробовать пакет кобра для запуска команд
+// TODO вынести инициализацию зависимостей бота отдельно
 func main() {
 	var (
 		configPath       string
@@ -150,7 +154,10 @@ func main() {
 		),
 	)
 
+	var bitmexSubscribers []*bitmextradedata.Subscriber
+
 	bitmexSubsForOrderProc := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
+	bitmexSubscribers = append(bitmexSubscribers, bitmexSubsForOrderProc)
 	ordProc := orderproc.New(tradeApi, cfg, bitmexSubsForOrderProc, log)
 
 	caches := candlecache.NewBinToCache(
@@ -161,13 +168,24 @@ func main() {
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	bitmexSubsTradeForStrategies := bitmextradedata.NewSubscriber(tradeThemes)
+	bitmexSubscribers = append(bitmexSubscribers, bitmexSubsTradeForStrategies)
 
-	bitmexDataSender := bitmextradedata.New(tradeApi.GetBitmex().GetWS().GetMessages(), log,
-		bitmexSubsTradeForStrategies, bitmexSubsForOrderProc)
+	var schedulr scheduler.Scheduler
+	if cfg.Scheduler.Position.Enable {
+		bitmexSubsForScheduler := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
+		bitmexSubscribers = append(bitmexSubscribers, bitmexSubsForScheduler)
+		schedulr = scheduler.NewPositionScheduler(
+			cfg, scheduler.LimitPositionPnls, tradeApi, ordProc, bitmexSubsForScheduler, log,
+		)
+	}
+
+	bitmexDataSender := bitmextradedata.New(tradeApi.GetBitmex().GetWS().GetMessages(), log, bitmexSubscribers...)
+
+	bbRsi := strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log)
 
 	wg := &sync.WaitGroup{}
 	strategiesTypes := strategies.New(wg, cfg, tradeApi, ordProc, bitmexDataSender, bitmexSubsTradeForStrategies,
-		dbManager, log, initSignals, strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log), caches)
+		schedulr, dbManager, log, initSignals, bbRsi, caches)
 	strategiesTypes.Start()
 	<-done
 

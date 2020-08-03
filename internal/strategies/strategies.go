@@ -7,6 +7,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
+
 	bitmextradedata "github.com/tagirmukail/tccbot-backend/internal/tradedata/bitmex"
 
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
@@ -24,6 +26,7 @@ import (
 )
 
 type Strategies struct {
+	initSignals           bool
 	wgRunner              *sync.WaitGroup
 	cfg                   *config.GlobalConfig
 	tradeApi              tradeapi.Api
@@ -33,7 +36,7 @@ type Strategies struct {
 	orderProc             *orderproc.OrderProcessor
 	bitmexDataSender      *bitmextradedata.Sender
 	bitmexTradeSubscriber *bitmextradedata.Subscriber
-	initSignals           bool
+	schedulr              scheduler.Scheduler
 	rsiPrev               struct {
 		minBorderInProc bool
 		maxBorderInProc bool
@@ -51,6 +54,7 @@ func New(
 	orderProc *orderproc.OrderProcessor,
 	bitmexDataSender *bitmextradedata.Sender,
 	bitmexTradeSubscriber *bitmextradedata.Subscriber,
+	schedulr scheduler.Scheduler,
 	db db.DBManager,
 	log *logrus.Logger,
 	initSignals bool,
@@ -64,6 +68,7 @@ func New(
 		orderProc:             orderProc,
 		bitmexDataSender:      bitmexDataSender,
 		bitmexTradeSubscriber: bitmexTradeSubscriber,
+		schedulr:              schedulr,
 		db:                    db,
 		log:                   log,
 		tradeCalc:             trademath.Calc{},
@@ -80,11 +85,18 @@ func (s *Strategies) Start() {
 	}
 	s.wgRunner.Add(1)
 	go s.start()
-	//s.wgRunner.Add(1)
-	//go s.orderProc.Start(s.wgRunner)
+	if s.schedulr != nil {
+		s.wgRunner.Add(1)
+		go s.schedulr.Start(s.wgRunner)
+	}
+
 	s.wgRunner.Add(1)
 	go s.bitmexDataSender.SendToSubscribers(s.wgRunner)
 	s.wgRunner.Wait()
+
+	if s.schedulr != nil {
+		_ = s.schedulr.Stop()
+	}
 }
 
 func (s *Strategies) start() {

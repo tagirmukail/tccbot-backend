@@ -11,20 +11,20 @@ import (
 type GlobalConfig struct {
 	ExchangesSettings ExchangesSettings
 	Admin             Admin
-	DB                DB
+	Scheduler         Scheduler
 	Accesses          ExchangesAccess
 	GlobStrategies    StrategiesGlobConfig
 	OrdProcPeriodSec  int
 	DBPath            string
 }
 
-type DB struct {
-	DBName   string
-	User     string
-	Password string
-	Host     string
-	Port     uint32
-	SSLMode  string
+type Scheduler struct {
+	Position PositionScheduler
+}
+
+type PositionScheduler struct {
+	Enable        bool
+	PriceTrailing float64
 }
 
 type StrategiesGlobConfig struct {
@@ -358,13 +358,11 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) {
 				},
 			},
 		},
-		DB: DB{
-			DBName:   viper.GetString("db.name"),
-			User:     viper.GetString("db.user"),
-			Password: viper.GetString("db.password"),
-			Host:     viper.GetString("db.host"),
-			Port:     viper.GetUint32("db.port"),
-			SSLMode:  viper.GetString("db.sslmode"),
+		Scheduler: Scheduler{
+			Position: PositionScheduler{
+				Enable:        viper.GetBool("scheduler.position.enable"),
+				PriceTrailing: viper.GetFloat64("scheduler.position.trailing_price"),
+			},
 		},
 		DBPath:           viper.GetString("db_path"),
 		OrdProcPeriodSec: viper.GetInt("ord_proc_period_sec"),

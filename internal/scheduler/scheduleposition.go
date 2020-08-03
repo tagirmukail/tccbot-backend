@@ -247,12 +247,12 @@ func (o *PositionScheduler) procActiveOrders() error {
 		switch types.Side(order.Side) {
 		case types.SideSell:
 			diff := inst.BidPrice - order.Price
-			if math.Abs(diff) > trailingPrice {
+			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
 				price = inst.BidPrice
 			}
 		case types.SideBuy:
 			diff := inst.AskPrice - order.Price
-			if math.Abs(diff) > trailingPrice {
+			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
 				price = inst.AskPrice
 			}
 		}
