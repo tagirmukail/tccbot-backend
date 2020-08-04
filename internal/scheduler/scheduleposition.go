@@ -132,6 +132,12 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 					positionData, err)
 				continue
 			}
+		} else {
+			continue
+		}
+
+		if positionData.UnrealisedPnl == 0 && positionData.CurrentQty == 0 {
+			continue
 		}
 
 		unrealisedPnl := trademath.ConvertToBTC(position.UnrealisedPnl)
@@ -167,6 +173,7 @@ func (o *PositionScheduler) clearPositionPnl() {
 	o.positionPnl = make([]*positionPnl, 0, o.positionPnlLimit)
 }
 
+// TODO фиксировать максимальное отклонение пнл а не последние пнл позиций, и уже от макс откл ориентироваться
 func (o *PositionScheduler) checkProfitPnlList(position bitmex.Position) {
 	o.mx.Lock()
 	defer o.mx.Unlock()
