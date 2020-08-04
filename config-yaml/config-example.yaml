@@ -98,6 +98,7 @@ scheduler:
   position:
     enable: true
     trailing_price: 5
+    profit_pnl_diff: 0.0002
 
 ord_proc_period_sec: 180
 db_path: sqlite3://tccbot_db?x-migrations-table=schema_migrations

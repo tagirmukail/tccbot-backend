@@ -156,9 +156,7 @@ func main() {
 
 	var bitmexSubscribers []*bitmextradedata.Subscriber
 
-	bitmexSubsForOrderProc := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
-	bitmexSubscribers = append(bitmexSubscribers, bitmexSubsForOrderProc)
-	ordProc := orderproc.New(tradeApi, cfg, bitmexSubsForOrderProc, log)
+	ordProc := orderproc.New(tradeApi, cfg, log)
 
 	caches := candlecache.NewBinToCache(
 		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,

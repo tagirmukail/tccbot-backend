@@ -116,7 +116,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		return nil
 	}
 
-	return placeBitmexOrder(s.orderProc, applySide, false, s.log)
+	return placeBitmexOrder(s.orderProc, applySide, true, s.log)
 }
 
 func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {

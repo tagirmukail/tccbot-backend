@@ -82,15 +82,27 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
 	tick := time.NewTicker(time.Duration(o.cfg.OrdProcPeriodSec) * time.Second)
-	defer tick.Stop()
 
 	for {
 		select {
 		case <-done:
+			tick.Stop()
 			return
 		case tradeData := <-o.bitmexDataSubscriber.GetMsgChan():
+			o.log.Debugf("PositionScheduler.Start process data table: %#v", tradeData.Table)
 			switch tradeData.Table {
 			case string(types.Position):
+
+				orders, err := getActiveOrders(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+				if err != nil {
+					o.log.Errorf("get active orders failed: %v", err)
+				}
+
+				if len(orders) > 0 {
+					o.log.Infoln("order on close position already placed, wait")
+					continue
+				}
+
 				o.processPosition(tradeData.Data)
 			}
 		case <-tick.C:
@@ -108,6 +120,7 @@ func (o *PositionScheduler) Stop() error {
 
 func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData) {
 	for _, positionData := range positions {
+		o.log.Debugf("PositionScheduler.Start process data : %#v", positionData)
 		var (
 			position = &bitmex.Position{}
 			err      error
@@ -185,7 +198,7 @@ func (o *PositionScheduler) checkProfitPnlList(position bitmex.Position) {
 			o.positionPnl[0], o.positionPnl[1])
 		return
 	case o.positionPnl[0].t == Profit && o.positionPnl[1].t == Profit:
-		if o.positionPnl[0].pnl > o.positionPnl[1].pnl {
+		if o.positionPnl[0].pnl > o.positionPnl[1].pnl+o.cfg.Scheduler.Position.ProfitPnlDiff {
 			ord, err := o.placeClosePositionOrder(position)
 			if err != nil {
 				o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() profit order failed: %v", err)
@@ -226,7 +239,7 @@ func (o *PositionScheduler) placeClosePositionOrder(position bitmex.Position) (i
 		return nil, errors.New("qty is 0")
 	}
 	ord, err := o.orderProc.PlaceOrder(
-		types.Bitmex, side, math.Abs(float64(position.CurrentQty)), true, false)
+		types.Bitmex, side, math.Abs(float64(position.CurrentQty)), true)
 	if err != nil {
 		return nil, err
 	}

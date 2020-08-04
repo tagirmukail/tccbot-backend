@@ -91,7 +91,7 @@ func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([
 func placeBitmexOrder(
 	orderProc *orderproc.OrderProcessor, side types.Side, passive bool, log *logrus.Logger,
 ) error {
-	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive, true)
+	ord, err := orderProc.PlaceOrder(types.Bitmex, side, 0, passive)
 	if err != nil {
 		log.Warnf("orderProc.PlaceOrder failed: %v", err)
 		return err
