@@ -46,7 +46,7 @@ type PositionScheduler struct {
 	cfg                  *config.GlobalConfig
 	bitmexDataSubscriber *betrayed.Subscriber
 	mx                   sync.Mutex
-	positionPnl          []*positionPnl
+	pnlT                 positionPnl
 	positionPnlLimit     int
 }
 
@@ -66,7 +66,6 @@ func NewPositionScheduler(
 		cfg:                  cfg,
 		mx:                   sync.Mutex{},
 		bitmexDataSubscriber: bitmexDataSubscriber,
-		positionPnl:          []*positionPnl{},
 		positionPnlLimit:     positionPnlLimit,
 	}
 }
@@ -149,91 +148,57 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 			pnlType = Loss
 		}
 
-		o.addToPositionPnl(&positionPnl{
+		o.processPnl(&positionPnl{
 			pnl: unrealisedPnl,
 			t:   pnlType,
-		})
-
-		o.checkProfitPnlList(*position)
+		}, *position)
 	}
 }
 
-func (o *PositionScheduler) addToPositionPnl(p *positionPnl) {
+func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position) {
 	o.mx.Lock()
 	defer o.mx.Unlock()
-	o.positionPnl = append(o.positionPnl, p)
-	if len(o.positionPnl) > o.positionPnlLimit {
-		o.positionPnl = o.positionPnl[len(o.positionPnl)-o.positionPnlLimit:]
+
+	var placeOrder bool
+	switch {
+	case o.pnlT.t == Profit && p.t == Loss:
+		placeOrder = true
+	case o.pnlT.t == Profit && o.pnlT.pnl < p.pnl:
+		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
+			o.pnlT, p)
+		o.pnlT = *p
+	case o.pnlT.t == Profit && p.pnl+o.cfg.Scheduler.Position.ProfitPnlDiff < o.pnlT.pnl:
+		placeOrder = true
+	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.ProfitPnlDiff/3):
+		placeOrder = true
+	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl:
+		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
+			o.pnlT, p)
+		o.pnlT = *p
+	default:
+		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
+			o.pnlT, p)
+		o.pnlT = *p
 	}
+
+	if !placeOrder {
+		return
+	}
+
+	ord, err := o.placeClosePositionOrder(position)
+	if err != nil {
+		o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() place %v order failed: %v", p.t, err)
+		return
+	}
+	o.log.Debugf("checkProfitPnlList() placed %v order: %#v", p.t, ord)
+	o.clearPositionPnl()
+	return
 }
 
 func (o *PositionScheduler) clearPositionPnl() {
 	o.mx.Lock()
 	defer o.mx.Unlock()
-	o.positionPnl = make([]*positionPnl, 0, o.positionPnlLimit)
-}
-
-// TODO фиксировать максимальное отклонение пнл а не последние пнл позиций, и уже от макс откл ориентироваться
-func (o *PositionScheduler) checkProfitPnlList(position bitmex.Position) {
-	o.mx.Lock()
-	defer o.mx.Unlock()
-
-	if len(o.positionPnl) < o.positionPnlLimit {
-		return
-	}
-
-	switch {
-	case o.positionPnl[0].t == Loss &&
-		(o.positionPnl[1].t == Profit || o.positionPnl[1].t == Neutral):
-		// we are waiting to check the position
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
-			o.positionPnl[0], o.positionPnl[1])
-		return
-	case o.positionPnl[0].t == Loss && o.positionPnl[1].t == Loss:
-		ord, err := o.placeClosePositionOrder(position)
-		if err != nil {
-			o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() stop loss failed: %v", err)
-			return
-		}
-		o.log.Debugf("checkProfitPnlList() placed stop loss order: %#v", ord)
-		o.clearPositionPnl()
-		return
-	case o.positionPnl[0].t == Neutral &&
-		(o.positionPnl[1].t == Profit || o.positionPnl[1].t == Loss):
-		// position has improved or started to deteriorate, we continue to monitor
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
-			o.positionPnl[0], o.positionPnl[1])
-		return
-	case o.positionPnl[0].t == Profit && o.positionPnl[1].t == Profit:
-		if o.positionPnl[0].pnl > o.positionPnl[1].pnl+o.cfg.Scheduler.Position.ProfitPnlDiff {
-			ord, err := o.placeClosePositionOrder(position)
-			if err != nil {
-				o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() profit order failed: %v", err)
-				return
-			}
-			o.log.Debugf("checkProfitPnlList() placed profit order: %#v", ord)
-			o.clearPositionPnl()
-			return
-		}
-		// we are waiting to check the position
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
-			o.positionPnl[0], o.positionPnl[1])
-		return
-	case o.positionPnl[0].t == Profit && o.positionPnl[1].t == Loss:
-		ord, err := o.placeClosePositionOrder(position)
-		if err != nil {
-			o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() stop loss failed: %v", err)
-			return
-		}
-		o.log.Debugf("checkProfitPnlList() placed stop loss order: %#v", ord)
-		o.clearPositionPnl()
-		return
-	case o.positionPnl[0].t == Profit && o.positionPnl[1].t == Neutral:
-		// we are waiting to check the position
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
-			o.positionPnl[0], o.positionPnl[1])
-		return
-	}
+	o.pnlT = positionPnl{}
 }
 
 func (o *PositionScheduler) placeClosePositionOrder(position bitmex.Position) (interface{}, error) {
@@ -268,12 +233,12 @@ func (o *PositionScheduler) procActiveOrders() error {
 		case types.SideSell:
 			diff := inst.BidPrice - order.Price
 			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
-				price = inst.BidPrice
+				price = inst.BidPrice + 2
 			}
 		case types.SideBuy:
 			diff := inst.AskPrice - order.Price
 			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
-				price = inst.AskPrice
+				price = inst.AskPrice - 2
 			}
 		}
 

@@ -84,7 +84,7 @@ func (s *Strategies) Start() {
 		s.log.Fatalf("SignalsInit failed: %v", err)
 	}
 	s.wgRunner.Add(1)
-	go s.start()
+	go s.start(s.wgRunner)
 	if s.schedulr != nil {
 		s.wgRunner.Add(1)
 		go s.schedulr.Start(s.wgRunner)
@@ -92,6 +92,9 @@ func (s *Strategies) Start() {
 
 	s.wgRunner.Add(1)
 	go s.bitmexDataSender.SendToSubscribers(s.wgRunner)
+
+	s.wgRunner.Add(1)
+	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
 	s.wgRunner.Wait()
 
 	if s.schedulr != nil {
@@ -99,11 +102,8 @@ func (s *Strategies) Start() {
 	}
 }
 
-func (s *Strategies) start() {
-	defer s.wgRunner.Done()
-
-	s.wgRunner.Add(1)
-	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
+func (s *Strategies) start(wg *sync.WaitGroup) {
+	defer wg.Done()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)

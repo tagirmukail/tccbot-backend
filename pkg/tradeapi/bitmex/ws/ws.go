@@ -23,7 +23,7 @@ import (
 
 const (
 	timeReadSleep    = 3 * time.Second
-	handshakeTimeout = 5 * time.Second
+	handshakeTimeout = 3 * time.Second
 
 	bitmexWSUrl        = "wss://www.bitmex.com/realtime"
 	bitmexTestnetWSUrl = "wss://testnet.bitmex.com/realtime"
@@ -131,10 +131,10 @@ func (r *WS) read(wg *sync.WaitGroup) {
 	for {
 		mType, msg, err := r.ws.ReadMessage()
 		if err != nil {
-			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-				r.log.Infof("read messages from bitmex ws stopped")
-				return
-			}
+			//if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+			//	r.log.Infof("read messages from bitmex ws stopped")
+			//	return
+			//}
 			r.log.Warnf("bitmex WS.read() read message from websocket error: %v", err)
 			time.Sleep(timeReadSleep)
 			continue
@@ -142,9 +142,8 @@ func (r *WS) read(wg *sync.WaitGroup) {
 
 		switch mType {
 		case websocket.CloseMessage:
-			r.log.Infof("WS.read() %s websocket bitmex closed", r.connUrl)
-			close(r.messages)
-			return
+			r.log.Infof("WS.read() %s websocket bitmex closed: %v", r.connUrl, string(msg))
+			continue
 		case websocket.TextMessage:
 			break
 		default:
@@ -178,8 +177,6 @@ func (r *WS) read(wg *sync.WaitGroup) {
 			return
 		case r.messages <- resp:
 			//r.log.Debugf("bitmex sends message data: %s", string(data))
-		default:
-			continue
 		}
 	}
 
