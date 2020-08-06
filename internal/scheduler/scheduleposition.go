@@ -159,6 +159,21 @@ func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position)
 	o.mx.Lock()
 	defer o.mx.Unlock()
 
+	if !o.checkPlaceOrder(p) {
+		return
+	}
+
+	ord, err := o.placeClosePositionOrder(position)
+	if err != nil {
+		o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() place %v order failed: %v", p.t, err)
+		return
+	}
+	o.log.Debugf("checkProfitPnlList() placed %v order: %#v", p.t, ord)
+	o.clearPositionPnl()
+	return
+}
+
+func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 	var placeOrder bool
 	switch {
 	case o.pnlT.t == Profit && p.t == Loss:
@@ -175,24 +190,9 @@ func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position)
 		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
-	default:
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
-			o.pnlT, p)
-		o.pnlT = *p
 	}
 
-	if !placeOrder {
-		return
-	}
-
-	ord, err := o.placeClosePositionOrder(position)
-	if err != nil {
-		o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() place %v order failed: %v", p.t, err)
-		return
-	}
-	o.log.Debugf("checkProfitPnlList() placed %v order: %#v", p.t, ord)
-	o.clearPositionPnl()
-	return
+	return placeOrder
 }
 
 func (o *PositionScheduler) clearPositionPnl() {
