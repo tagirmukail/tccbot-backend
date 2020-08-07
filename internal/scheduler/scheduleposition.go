@@ -165,31 +165,36 @@ func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position)
 
 	ord, err := o.placeClosePositionOrder(position)
 	if err != nil {
-		o.log.Errorln("checkProfitPnlList() placeClosePositionOrder() place %v order failed: %v", p.t, err)
+		o.log.Errorf("checkProfitPnlList() placeClosePositionOrder() place %v order failed: %v", p.t, err)
 		return
 	}
 	o.log.Debugf("checkProfitPnlList() placed %v order: %#v", p.t, ord)
 	o.clearPositionPnl()
-	return
 }
 
+// TODO unit tests
 func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 	var placeOrder bool
 	switch {
 	case o.pnlT.t == Profit && p.t == Loss:
 		placeOrder = true
-	case o.pnlT.t == Profit && o.pnlT.pnl < p.pnl:
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
+	case /*o.pnlT.t == Profit &&*/ o.pnlT.pnl < p.pnl:
+		o.log.Debugf("[o.pnlT.t == Profit && o.pnlT.pnl < p.pnl] we are waiting to check the position, "+
+			"[pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
-	case o.pnlT.t == Profit && p.pnl+o.cfg.Scheduler.Position.ProfitPnlDiff < o.pnlT.pnl:
+	case o.pnlT.t == Profit && p.pnl+o.cfg.Scheduler.Position.ProfitPnlDiff <= o.pnlT.pnl:
 		placeOrder = true
 	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.ProfitPnlDiff/3):
 		placeOrder = true
 	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl:
-		o.log.Debugf("we are waiting to check the position, [pnl1]: %#v, [pnl2]: %#v",
+		o.log.Debugf("[pnlT is loss and p.pnl > o.pnlT.pnl] we are waiting to check the position, ["+
+			"pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
+	default:
+		o.log.Debugf("[default] we are waiting to check the position, [pnlT]: %#v, [p]: %#v",
+			o.pnlT, p)
 	}
 
 	return placeOrder
