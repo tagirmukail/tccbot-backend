@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -29,7 +30,8 @@ type OrderProcessor struct {
 	api             tradeapi.Api
 	log             *logrus.Logger
 	cfg             *config.GlobalConfig
-	currentPosition bitmex.Position
+	mx              sync.Mutex
+	currentPosition *bitmex.Position
 }
 
 func New(
@@ -42,6 +44,18 @@ func New(
 		cfg:        cfg,
 		log:        log,
 	}
+}
+
+func (o *OrderProcessor) SetPosition(p *bitmex.Position) {
+	o.mx.Lock()
+	defer o.mx.Unlock()
+	o.currentPosition = p
+}
+
+func (o *OrderProcessor) getPosition() (*bitmex.Position, bool) {
+	o.mx.Lock()
+	defer o.mx.Unlock()
+	return o.currentPosition, o.currentPosition != nil
 }
 
 func (o *OrderProcessor) PlaceOrder(
@@ -76,12 +90,11 @@ func (o *OrderProcessor) PlaceOrder(
 		}
 
 		if amount == 0 {
-			err = o.checkLiquidation(&o.currentPosition, price, side)
+			err = o.checkLiquidation(price, side)
 			if err != nil {
 				return nil, err
 			}
 			amount, err = o.calcOrderQty(
-				&o.currentPosition,
 				availableBalance,
 				side,
 			)
@@ -189,15 +202,19 @@ func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
 }
 
 func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
+	currentPosition, ok := o.getPosition()
+	if !ok {
+		return nil
+	}
 	switch side {
 	case types.SideSell:
-		isLimitedShort := o.currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedShort := currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedShort {
 			return fmt.Errorf("place sell order limitted - qty: %d, limit: %d",
 				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		}
 	case types.SideBuy:
-		isLimitedLong := o.currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedLong := currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedLong {
 			return fmt.Errorf("place buy order limitted - qty: %d, limit: %d",
 				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
@@ -209,7 +226,11 @@ func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
 }
 
 // calcOrderQty in contracts
-func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64, side types.Side) (qtyContrts float64, err error) {
+func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyContrts float64, err error) {
+	position, ok := o.getPosition()
+	if !ok {
+		return
+	}
 	positionPnlToBTC := trademath.ConvertToBTC(position.UnrealisedPnl)
 	if positionPnlToBTC > 0 {
 		if position.CurrentQty > 0 {
@@ -242,7 +263,11 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 }
 
 //
-func (o *OrderProcessor) checkLiquidation(position *bitmex.Position, price float64, side types.Side) error {
+func (o *OrderProcessor) checkLiquidation(price float64, side types.Side) error {
+	position, ok := o.getPosition()
+	if !ok {
+		return nil
+	}
 	liquidationDiff := math.Abs(position.LiquidationPrice - price)
 	isLiquidationWarn := liquidationDiff < liquidationPriceLimit
 	if position.CurrentQty < 0 &&
