@@ -47,6 +47,11 @@ func FromBitmexIncDataToPosition(d *data.BitmexIncomingData) (*bitmex.Position, 
 		return nil, err
 	}
 
+	var unrealPnl int64
+	if d.UnrealisedPnl != nil {
+		unrealPnl = *d.UnrealisedPnl
+	}
+
 	position := bitmex.Position{
 		Account:              d.Account,
 		AvgCostPrice:         d.AvgCostPrice,
@@ -134,7 +139,7 @@ func FromBitmexIncDataToPosition(d *data.BitmexIncomingData) (*bitmex.Position, 
 		Underlying:           d.Underlying,
 		UnrealisedCost:       d.UnrealisedCost,
 		UnrealisedGrossPnl:   d.UnrealisedGrossPnl,
-		UnrealisedPnl:        d.UnrealisedPnl,
+		UnrealisedPnl:        unrealPnl,
 		UnrealisedPnlPcnt:    d.UnrealisedPnlPcnt,
 		UnrealisedRoePcnt:    d.UnrealisedRoePcnt,
 		UnrealisedTax:        d.UnrealisedTax,

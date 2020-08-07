@@ -98,7 +98,7 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 				}
 
 				if len(orders) > 0 {
-					o.log.Infoln("order on close position already placed, wait")
+					o.log.Infoln("order already placed, wait")
 					continue
 				}
 
@@ -135,7 +135,7 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 			continue
 		}
 
-		if positionData.UnrealisedPnl == 0 && positionData.CurrentQty == 0 {
+		if position.UnrealisedPnl == 0 || positionData.CurrentQty == 0 {
 			continue
 		}
 
@@ -178,8 +178,8 @@ func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 	switch {
 	case o.pnlT.t == Profit && p.t == Loss:
 		placeOrder = true
-	case /*o.pnlT.t == Profit &&*/ o.pnlT.pnl < p.pnl:
-		o.log.Debugf("[o.pnlT.t == Profit && o.pnlT.pnl < p.pnl] we are waiting to check the position, "+
+	case o.pnlT.pnl < p.pnl:
+		o.log.Debugf("[o.pnlT.pnl < p.pnl] we are waiting to check the position, "+
 			"[pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
@@ -187,11 +187,15 @@ func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 		placeOrder = true
 	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.ProfitPnlDiff/3):
 		placeOrder = true
-	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl:
-		o.log.Debugf("[pnlT is loss and p.pnl > o.pnlT.pnl] we are waiting to check the position, ["+
+	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl: // m. b. not needed
+		o.log.Debugf("[o.pnlT.t == Loss && p.pnl > o.pnlT.pnl] we are waiting to check the position, ["+
 			"pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
+	case o.pnlT.t == Neutral && p.t == Loss:
+		o.log.Debugf("[o.pnlT.t == Neutral && p.t == Loss] we are waiting to check the position, "+
+			"[pnlT]: %#v, [p]: %#v",
+			o.pnlT, p)
 	default:
 		o.log.Debugf("[default] we are waiting to check the position, [pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)

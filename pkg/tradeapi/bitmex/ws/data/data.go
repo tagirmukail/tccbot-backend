@@ -121,7 +121,7 @@ type PositionData struct {
 	Underlying         string  `json:"underlying"`
 	UnrealisedCost     int64   `json:"unrealisedCost"`
 	UnrealisedGrossPnl int64   `json:"unrealisedGrossPnl"`
-	UnrealisedPnl      int64   `json:"unrealisedPnl"`
+	UnrealisedPnl      *int64  `json:"unrealisedPnl"`
 	UnrealisedPnlPcnt  float64 `json:"unrealisedPnlPcnt"`
 	UnrealisedRoePcnt  float64 `json:"unrealisedRoePcnt"`
 	UnrealisedTax      int64   `json:"unrealisedTax"`
