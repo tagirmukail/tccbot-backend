@@ -201,7 +201,7 @@ func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 		o.pnlT = *p
 	case o.pnlT.t == Profit && p.pnl+o.cfg.Scheduler.Position.ProfitPnlDiff <= o.pnlT.pnl:
 		placeOrder = true
-	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.ProfitPnlDiff/3):
+	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.LossPnlDiff):
 		placeOrder = true
 	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl: // m. b. not needed
 		o.log.Debugf("[o.pnlT.t == Loss && p.pnl > o.pnlT.pnl] we are waiting to check the position, ["+
@@ -249,40 +249,49 @@ func (o *PositionScheduler) procActiveOrders() error {
 		return err
 	}
 	for _, order := range orders {
-		inst, err := getInstrument(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+		_, err = o.procActiveOrder(order)
 		if err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func (o *PositionScheduler) procActiveOrder(order bitmex.OrderCopied) (ord bitmex.OrderCopied, err error) {
+	for i := 0; i < 5; i++ {
+		var inst bitmex.Instrument
+		inst, err = getInstrument(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+		if err != nil {
+			continue
 		}
 		var price float64
 		switch types.Side(order.Side) {
 		case types.SideSell:
 			diff := inst.BidPrice - order.Price
 			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
-				price = inst.BidPrice + 2
+				price = inst.BidPrice + 0.5
 			}
 		case types.SideBuy:
 			diff := inst.AskPrice - order.Price
 			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
-				price = inst.AskPrice - 2
+				price = inst.AskPrice - 0.5
 			}
 		}
-
 		if price == 0 {
 			o.log.Debugf("[order]: %v not need change [price]: %v", order.OrderID, order.Price)
-			return nil
+			return ord, err
 		}
-
-		ord, err := o.api.GetBitmex().AmendOrder(&bitmex.OrderAmendParams{
+		ord, err = o.api.GetBitmex().AmendOrder(&bitmex.OrderAmendParams{
 			OrderID: order.OrderID,
 			Price:   price,
 			Text:    "amend order - proc active orders",
 		})
 		if err != nil {
-			return err
+			continue
 		}
-
 		o.log.Debugf("[order]: %v price changed to %v", ord.OrderID, price)
+		break
 	}
-
-	return nil
+	return ord, err
 }
