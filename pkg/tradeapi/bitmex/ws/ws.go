@@ -131,10 +131,10 @@ func (r *WS) read(wg *sync.WaitGroup) {
 	for {
 		mType, msg, err := r.ws.ReadMessage()
 		if err != nil {
-			//if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
-			//	r.log.Infof("read messages from bitmex ws stopped")
-			//	return
-			//}
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				r.log.Infof("read messages from bitmex ws stopped")
+				return
+			}
 			r.log.Warnf("bitmex WS.read() read message from websocket error: %v", err)
 			time.Sleep(timeReadSleep)
 			continue
