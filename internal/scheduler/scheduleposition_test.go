@@ -1,7 +1,6 @@
 package scheduler
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -137,7 +136,7 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			},
 			args: args{
 				p: &positionPnl{
-					pnl: 0.02,
+					pnl: 0.021,
 					t:   Profit,
 				},
 			},
@@ -154,7 +153,6 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			o := &PositionScheduler{
 				log:              tt.fields.log,
 				cfg:              tt.fields.cfg,
-				mx:               sync.Mutex{},
 				pnlT:             tt.fields.pnlT,
 				positionPnlLimit: tt.fields.positionPnlLimit,
 			}

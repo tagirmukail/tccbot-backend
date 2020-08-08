@@ -22,8 +22,8 @@ import (
 )
 
 const (
-	LimitPositionPnls = 2
-	trailingPrice     = 5
+	LimitPositionPnls      = 2
+	expirePositionDuration = 5 * time.Minute
 )
 
 type PnlType uint8
@@ -79,12 +79,15 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
-	tick := time.NewTicker(time.Duration(o.cfg.OrdProcPeriodSec) * time.Second)
-
+	activeOrdersTick := time.NewTicker(time.Duration(o.cfg.OrdProcPeriodSec) * time.Second)
+	positionCleanTick := time.NewTicker(expirePositionDuration)
+	defer func() {
+		activeOrdersTick.Stop()
+		positionCleanTick.Stop()
+	}()
 	for {
 		select {
 		case <-done:
-			tick.Stop()
 			return
 		case tradeData := <-o.bitmexDataSubscriber.GetMsgChan():
 			o.log.Debugf("PositionScheduler.Start process data table: %#v", tradeData.Table)
@@ -92,11 +95,27 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 			case string(types.Position):
 				o.processPosition(tradeData.Data)
 			}
-		case <-tick.C:
+		case <-activeOrdersTick.C:
 			err := o.procActiveOrders()
 			if err != nil {
 				o.log.Errorf("o.procActiveOrders() failed: %v", err)
 			}
+		case <-positionCleanTick.C:
+			o.log.Debugf("clean position started")
+			currentPosition, ok := o.orderProc.GetPosition()
+			if !ok {
+				o.log.Debugf("position already clear")
+				continue
+			}
+			expTime := currentPosition.Timestamp.UTC().Add(expirePositionDuration)
+			now := time.Now().UTC()
+			if now.After(expTime) {
+				o.log.Debugf("position cleaned now")
+				o.orderProc.SetPosition(nil)
+				continue
+			}
+
+			o.log.Debugf("clean position expire time not now")
 		}
 	}
 }

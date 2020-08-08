@@ -12,12 +12,12 @@ import (
 
 func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	type fields struct {
-		cfg *config.GlobalConfig
+		cfg      *config.GlobalConfig
+		position *bitmex.Position
 	}
 	type args struct {
-		position *bitmex.Position
-		balance  float64
-		side     types.Side
+		balance float64
+		side    types.Side
 	}
 	type test struct {
 		fields         fields
@@ -37,12 +37,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-			},
-			args: args{
 				position: &bitmex.Position{
 					CurrentQty:    345,
 					UnrealisedPnl: 163,
 				},
+			},
+			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -50,9 +50,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg: tt.fields.cfg,
+			currentPosition: tt.fields.position,
+			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.position, tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -68,12 +69,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-			},
-			args: args{
 				position: &bitmex.Position{
 					OpeningQty:    0,
 					UnrealisedPnl: -100,
 				},
+			},
+			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -81,9 +82,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg: tt.fields.cfg,
+			currentPosition: tt.fields.position,
+			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.position, tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -99,12 +101,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-			},
-			args: args{
 				position: &bitmex.Position{
 					OpeningQty:    0,
 					UnrealisedPnl: 0,
 				},
+			},
+			args: args{
 				balance: 0.0090,
 				side:    types.SideSell,
 			},
@@ -112,9 +114,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg: tt.fields.cfg,
+			cfg:             tt.fields.cfg,
+			currentPosition: tt.fields.position,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.position, tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -122,6 +125,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	t.Run("side empty", func(t *testing.T) {
 		tt := test{
 			fields: fields{
+				position: &bitmex.Position{
+					OpeningQty:    0,
+					UnrealisedPnl: 0,
+				},
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.ApiSettings{
@@ -132,10 +139,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 				},
 			},
 			args: args{
-				position: &bitmex.Position{
-					OpeningQty:    0,
-					UnrealisedPnl: 0,
-				},
 				balance: 0.0090,
 				side:    types.SideEmpty,
 			},
@@ -144,9 +147,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg: tt.fields.cfg,
+			currentPosition: tt.fields.position,
+			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.position, tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
 		require.EqualError(t, err, tt.wantErr.Error())
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -162,12 +166,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-			},
-			args: args{
 				position: &bitmex.Position{
 					OpeningQty:    0,
 					UnrealisedPnl: 0,
 				},
+			},
+			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -175,9 +179,10 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg: tt.fields.cfg,
+			cfg:             tt.fields.cfg,
+			currentPosition: tt.fields.position,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.position, tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})

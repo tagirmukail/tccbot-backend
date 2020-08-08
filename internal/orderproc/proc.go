@@ -52,7 +52,7 @@ func (o *OrderProcessor) SetPosition(p *bitmex.Position) {
 	o.currentPosition = p
 }
 
-func (o *OrderProcessor) getPosition() (*bitmex.Position, bool) {
+func (o *OrderProcessor) GetPosition() (*bitmex.Position, bool) {
 	o.mx.Lock()
 	defer o.mx.Unlock()
 	return o.currentPosition, o.currentPosition != nil
@@ -202,7 +202,7 @@ func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
 }
 
 func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
-	currentPosition, ok := o.getPosition()
+	currentPosition, ok := o.GetPosition()
 	if !ok {
 		return nil
 	}
@@ -227,18 +227,12 @@ func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
 
 // calcOrderQty in contracts
 func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyContrts float64, err error) {
-	position, ok := o.getPosition()
-	if !ok {
-		return
-	}
-	positionPnlToBTC := trademath.ConvertToBTC(position.UnrealisedPnl)
-	if positionPnlToBTC > 0 {
+	position, ok := o.GetPosition()
+	if ok {
 		if position.CurrentQty > 0 {
 			qtyContrts = math.Abs(float64(position.CurrentQty))
 			return
 		}
-		qtyContrts = float64(limitMinOnOrderQty)
-		return
 	}
 
 	var qtyBtc float64
@@ -264,7 +258,7 @@ func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyCont
 
 //
 func (o *OrderProcessor) checkLiquidation(price float64, side types.Side) error {
-	position, ok := o.getPosition()
+	position, ok := o.GetPosition()
 	if !ok {
 		return nil
 	}
