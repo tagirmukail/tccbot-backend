@@ -103,6 +103,7 @@ func TestCandleCache_StoreBatch(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.StoreBatch(tt.args.batch)
@@ -228,6 +229,7 @@ func TestCandleCache_Store(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.store = tt.fields.store
@@ -570,6 +572,7 @@ func TestCandleCache_GetBucketed(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.store = tt.fields.store

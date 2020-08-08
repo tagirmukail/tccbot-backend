@@ -17,7 +17,7 @@ type Scheduler interface {
 	Stop() error
 }
 
-func getActiveOrders(api tradeapi.Api, symbol string) ([]bitmex.OrderCopied, error) {
+func getActiveOrders(api tradeapi.API, symbol string) ([]bitmex.OrderCopied, error) {
 	filter := fmt.Sprintf(`{"open": %t}`, true)
 	return api.GetBitmex().GetOrders(&bitmex.OrdersRequest{
 		Symbol: symbol,
@@ -25,7 +25,7 @@ func getActiveOrders(api tradeapi.Api, symbol string) ([]bitmex.OrderCopied, err
 	})
 }
 
-func getInstrument(api tradeapi.Api, symbol string) (bitmex.Instrument, error) {
+func getInstrument(api tradeapi.API, symbol string) (bitmex.Instrument, error) {
 	var resp bitmex.Instrument
 	insts, err := api.GetBitmex().GetInstrument(bitmex.InstrumentRequestParams{
 		Symbol:  symbol,
@@ -41,7 +41,7 @@ func getInstrument(api tradeapi.Api, symbol string) (bitmex.Instrument, error) {
 	return insts[0], nil
 }
 
-func FromBitmexIncDataToPosition(d *data.BitmexIncomingData) (*bitmex.Position, error) {
+func FromBitmexIncDataToPosition(d data.BitmexIncomingData) (*bitmex.Position, error) { // nolint:funlen
 	ts, err := time.Parse("2006-01-02T15:04:05.999Z", d.Timestamp)
 	if err != nil {
 		return nil, err

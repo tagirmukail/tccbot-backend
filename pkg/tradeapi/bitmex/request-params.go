@@ -98,7 +98,7 @@ type OrdersRequest struct {
 
 // OrderAmendParams contains all the parameters to send to the API endpoint
 // for the order amend operation
-type OrderAmendParams struct {
+type OrderAmendParams struct { // nolint:maligned
 	// ClientOrderID - [Optional] new Client Order ID, requires `origClOrdID`.
 	ClientOrderID string `json:"clOrdID,omitempty"`
 
@@ -214,7 +214,7 @@ type TradeGetBucketedParams struct {
 	Symbol string `json:"symbol,omitempty"`
 }
 
-func (t *TradeGetBucketedParams) toUrlVals() (*url.Values, error) {
+func (t *TradeGetBucketedParams) toURLVals() (*url.Values, error) {
 	var vals *url.Values
 	if t.BinSize == "" {
 		return nil, errors.New("binSize is required")
@@ -237,10 +237,10 @@ func (t *TradeGetBucketedParams) toUrlVals() (*url.Values, error) {
 	if t.Filter != "" {
 		vals.Add("filter", t.Filter)
 	}
-	if t.Partial == true {
+	if t.Partial == true { // nolint:gosimple
 		vals.Add("partial", strconv.FormatBool(t.Partial))
 	}
-	if t.Reverse == true {
+	if t.Reverse == true { // nolint:gosimple
 		vals.Add("reverse", strconv.FormatBool(t.Reverse))
 	}
 	if t.Start > 0 {
@@ -314,7 +314,7 @@ type InstrumentRequestParams struct {
 	Symbol string `json:"symbol,omitempty"`
 }
 
-func (i *InstrumentRequestParams) toUrlVars() url.Values {
+func (i *InstrumentRequestParams) toURLVals() url.Values {
 	vals := url.Values{}
 	vals.Add("columns", i.Columns)
 	vals.Add("count", strconv.Itoa(int(i.Count)))

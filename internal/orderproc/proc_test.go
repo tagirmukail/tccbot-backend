@@ -31,7 +31,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 			fields: fields{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
-						Bitmex: config.ApiSettings{
+						Bitmex: config.APISettings{
 							SellOrderCoef: 0.1,
 							BuyOrderCoef:  0.2,
 						},
@@ -63,7 +63,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 			fields: fields{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
-						Bitmex: config.ApiSettings{
+						Bitmex: config.APISettings{
 							SellOrderCoef: 0.1,
 							BuyOrderCoef:  0.15,
 						},
@@ -95,7 +95,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 			fields: fields{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
-						Bitmex: config.ApiSettings{
+						Bitmex: config.APISettings{
 							SellOrderCoef: 0.1,
 							BuyOrderCoef:  0.15,
 						},
@@ -131,7 +131,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 				},
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
-						Bitmex: config.ApiSettings{
+						Bitmex: config.APISettings{
 							SellOrderCoef: 0.1,
 							BuyOrderCoef:  0.15,
 						},
@@ -160,7 +160,7 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 			fields: fields{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
-						Bitmex: config.ApiSettings{
+						Bitmex: config.APISettings{
 							SellOrderCoef: 0.1,
 							BuyOrderCoef:  0.01,
 						},

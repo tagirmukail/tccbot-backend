@@ -9,7 +9,7 @@ import (
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-	types2 "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
+	stratypes "github.com/tagirmukail/tccbot-backend/internal/strategies/types"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
@@ -18,7 +18,7 @@ func TestTrendFilter_Apply(t *testing.T) {
 	type fields struct {
 		cfg         *config.GlobalConfig
 		log         *logrus.Logger
-		prevActions []types2.Action
+		prevActions []stratypes.Action
 	}
 	type args struct {
 		ctx context.Context
@@ -38,17 +38,18 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log: logrus.New(),
-				prevActions: []types2.Action{
-					types2.DownTrend,
-					types2.NotTrend,
-					types2.UpTrend,
-					types2.NotTrend,
-					types2.NotTrend,
+				prevActions: []stratypes.Action{
+					stratypes.DownTrend,
+					stratypes.NotTrend,
+					stratypes.UpTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(
+					context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.NotTrend),
+						stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideBuy,
 		}
@@ -74,17 +75,18 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log: logrus.New(),
-				prevActions: []types2.Action{
-					types2.UpTrend,
-					types2.DownTrend,
-					types2.NotTrend,
-					types2.NotTrend,
-					types2.NotTrend,
+				prevActions: []stratypes.Action{
+					stratypes.UpTrend,
+					stratypes.DownTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(
+					context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.NotTrend),
+						stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideSell,
 		}
@@ -110,16 +112,16 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log: logrus.New(),
-				prevActions: []types2.Action{
-					types2.UpTrend,
-					types2.DownTrend,
-					types2.NotTrend,
-					types2.NotTrend,
+				prevActions: []stratypes.Action{
+					stratypes.UpTrend,
+					stratypes.DownTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.UpTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.UpTrend),
+					stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -127,12 +129,12 @@ func TestTrendFilter_Apply(t *testing.T) {
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
-		require.Equal(t, []types2.Action{
-			types2.UpTrend,
-			types2.DownTrend,
-			types2.NotTrend,
-			types2.NotTrend,
-			types2.UpTrend,
+		require.Equal(t, []stratypes.Action{
+			stratypes.UpTrend,
+			stratypes.DownTrend,
+			stratypes.NotTrend,
+			stratypes.NotTrend,
+			stratypes.UpTrend,
 		}, f.prevActions)
 	})
 
@@ -151,16 +153,17 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log: logrus.New(),
-				prevActions: []types2.Action{
-					types2.DownTrend,
-					types2.DownTrend,
-					types2.NotTrend,
-					types2.DownTrend,
+				prevActions: []stratypes.Action{
+					stratypes.DownTrend,
+					stratypes.DownTrend,
+					stratypes.NotTrend,
+					stratypes.DownTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.DownTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(
+					context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.DownTrend),
+						stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -168,12 +171,12 @@ func TestTrendFilter_Apply(t *testing.T) {
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
-		require.Equal(t, []types2.Action{
-			types2.DownTrend,
-			types2.DownTrend,
-			types2.NotTrend,
-			types2.DownTrend,
-			types2.DownTrend,
+		require.Equal(t, []stratypes.Action{
+			stratypes.DownTrend,
+			stratypes.DownTrend,
+			stratypes.NotTrend,
+			stratypes.DownTrend,
+			stratypes.DownTrend,
 		}, f.prevActions)
 	})
 
@@ -192,17 +195,18 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log: logrus.New(),
-				prevActions: []types2.Action{
-					types2.NotTrend,
-					types2.NotTrend,
-					types2.NotTrend,
-					types2.NotTrend,
-					types2.NotTrend,
+				prevActions: []stratypes.Action{
+					stratypes.NotTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
+					stratypes.NotTrend,
 				},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(
+					context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.NotTrend),
+						stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -210,13 +214,13 @@ func TestTrendFilter_Apply(t *testing.T) {
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
-		require.Equal(t, []types2.Action{
-			types2.NotTrend,
-			types2.NotTrend,
-			types2.NotTrend,
-			types2.NotTrend,
-			types2.NotTrend,
-			types2.NotTrend,
+		require.Equal(t, []stratypes.Action{
+			stratypes.NotTrend,
+			stratypes.NotTrend,
+			stratypes.NotTrend,
+			stratypes.NotTrend,
+			stratypes.NotTrend,
+			stratypes.NotTrend,
 		}, f.prevActions)
 	})
 
@@ -235,11 +239,12 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log:         logrus.New(),
-				prevActions: []types2.Action{},
+				prevActions: []stratypes.Action{},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.WithValue(context.Background(), types2.ActionKey, types2.NotTrend),
-					types2.CandlesKey, []bitmex.TradeBuck{}), types2.BinSizeKey, models.Bin5m),
+				ctx: context.WithValue(
+					context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.NotTrend),
+						stratypes.CandlesKey, []bitmex.TradeBuck{}), stratypes.BinSizeKey, models.Bin5m),
 			},
 			want: types.SideEmpty,
 		}
@@ -247,8 +252,8 @@ func TestTrendFilter_Apply(t *testing.T) {
 		f.prevActions = tt.fields.prevActions
 		got := f.Apply(tt.args.ctx)
 		require.Equal(t, tt.want, got, "apply side not equal")
-		require.Equal(t, []types2.Action{
-			types2.NotTrend,
+		require.Equal(t, []stratypes.Action{
+			stratypes.NotTrend,
 		}, f.prevActions)
 	})
 
@@ -267,10 +272,10 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log:         logrus.New(),
-				prevActions: []types2.Action{},
+				prevActions: []stratypes.Action{},
 			},
 			args: args{
-				ctx: context.WithValue(context.Background(), "candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.Background(), stratypes.CandlesKey, []bitmex.TradeBuck{}),
 			},
 			want: types.SideEmpty,
 		}
@@ -296,11 +301,11 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log:         logrus.New(),
-				prevActions: []types2.Action{},
+				prevActions: []stratypes.Action{},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", "NotAction"),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, "NotAction"),
+					stratypes.CandlesKey, []bitmex.TradeBuck{}),
 			},
 			want: types.SideEmpty,
 		}
@@ -326,11 +331,11 @@ func TestTrendFilter_Apply(t *testing.T) {
 					},
 				},
 				log:         logrus.New(),
-				prevActions: []types2.Action{},
+				prevActions: []stratypes.Action{},
 			},
 			args: args{
-				ctx: context.WithValue(context.WithValue(context.Background(), "action", types2.Action(6)),
-					"candles", []bitmex.TradeBuck{}),
+				ctx: context.WithValue(context.WithValue(context.Background(), stratypes.ActionKey, stratypes.Action(6)),
+					stratypes.CandlesKey, []bitmex.TradeBuck{}),
 			},
 			want: types.SideEmpty,
 		}

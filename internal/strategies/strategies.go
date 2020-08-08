@@ -26,21 +26,22 @@ import (
 )
 
 type Strategies struct {
-	initSignals           bool
+	initSignals bool
+	rsiPrev     struct {
+		minBorderInProc bool
+		maxBorderInProc bool
+	}
 	wgRunner              *sync.WaitGroup
 	cfg                   *config.GlobalConfig
-	tradeApi              tradeapi.Api
-	db                    db.DBManager
+	tradeAPI              tradeapi.API
+	db                    db.DatabaseManager
 	log                   *logrus.Logger
 	tradeCalc             trademath.Calc
 	orderProc             *orderproc.OrderProcessor
 	bitmexDataSender      *bitmextradedata.Sender
 	bitmexTradeSubscriber *bitmextradedata.Subscriber
 	schedulr              scheduler.Scheduler
-	rsiPrev               struct {
-		minBorderInProc bool
-		maxBorderInProc bool
-	}
+
 	candlesCaches candlecache.Caches
 
 	bbRsi strategy.Strategy
@@ -50,12 +51,12 @@ type Strategies struct {
 func New(
 	wgRunner *sync.WaitGroup,
 	cfg *config.GlobalConfig,
-	tradeApi tradeapi.Api,
+	tradeAPI tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
 	bitmexDataSender *bitmextradedata.Sender,
 	bitmexTradeSubscriber *bitmextradedata.Subscriber,
 	schedulr scheduler.Scheduler,
-	db db.DBManager,
+	db db.DatabaseManager,
 	log *logrus.Logger,
 	initSignals bool,
 	bbStrategy strategy.Strategy,
@@ -64,7 +65,7 @@ func New(
 	return &Strategies{
 		wgRunner:              wgRunner,
 		cfg:                   cfg,
-		tradeApi:              tradeApi,
+		tradeAPI:              tradeAPI,
 		orderProc:             orderProc,
 		bitmexDataSender:      bitmexDataSender,
 		bitmexTradeSubscriber: bitmexTradeSubscriber,
@@ -94,7 +95,7 @@ func (s *Strategies) Start() {
 	go s.bitmexDataSender.SendToSubscribers(s.wgRunner)
 
 	s.wgRunner.Add(1)
-	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
+	go s.tradeAPI.GetBitmex().GetWS().Start(s.wgRunner)
 	s.wgRunner.Wait()
 
 	if s.schedulr != nil {
@@ -102,7 +103,7 @@ func (s *Strategies) Start() {
 	}
 }
 
-func (s *Strategies) start(wg *sync.WaitGroup) {
+func (s *Strategies) start(wg *sync.WaitGroup) { // nolint:gocognit
 	defer wg.Done()
 
 	done := make(chan os.Signal, 1)

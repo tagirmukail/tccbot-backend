@@ -36,6 +36,7 @@ func Test_buildSubscribeParams(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := buildSubscribeParams(tt.args.symbol, tt.args.themes)
 			assert.Equal(t, tt.want, got)

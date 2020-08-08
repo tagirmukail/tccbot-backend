@@ -40,7 +40,7 @@ type positionPnl struct {
 }
 
 type PositionScheduler struct {
-	api                  tradeapi.Api
+	api                  tradeapi.API
 	orderProc            *orderproc.OrderProcessor
 	log                  *logrus.Logger
 	cfg                  *config.GlobalConfig
@@ -54,7 +54,7 @@ type PositionScheduler struct {
 func NewPositionScheduler(
 	cfg *config.GlobalConfig,
 	positionPnlLimit int,
-	api tradeapi.Api,
+	api tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
 	bitmexDataSubscriber *betrayed.Subscriber,
 	log *logrus.Logger,
@@ -91,8 +91,7 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 			return
 		case tradeData := <-o.bitmexDataSubscriber.GetMsgChan():
 			o.log.Debugf("PositionScheduler.Start process data table: %#v", tradeData.Table)
-			switch tradeData.Table {
-			case string(types.Position):
+			if tradeData.Table == string(types.Position) {
 				o.processPosition(tradeData.Data)
 			}
 		case <-activeOrdersTick.C:
@@ -143,7 +142,7 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 			err      error
 		)
 		if string(positionData.Symbol) == o.cfg.ExchangesSettings.Bitmex.Symbol {
-			position, err = FromBitmexIncDataToPosition(&positionData)
+			position, err = FromBitmexIncDataToPosition(positionData)
 			if err != nil {
 				o.log.Errorf("[bitmex exchange data]:%#v convert to position failed [err]:%v",
 					positionData, err)
@@ -228,11 +227,12 @@ func (o *PositionScheduler) clearPositionPnl() {
 
 func (o *PositionScheduler) placeClosePositionOrder(position bitmex.Position) (interface{}, error) {
 	var side types.Side
-	if position.CurrentQty > 0 {
+	switch {
+	case position.CurrentQty > 0:
 		side = types.SideSell
-	} else if position.CurrentQty < 0 {
+	case position.CurrentQty < 0:
 		side = types.SideBuy
-	} else {
+	default:
 		return nil, errors.New("qty is 0")
 	}
 	ord, err := o.orderProc.PlaceOrder(

@@ -74,6 +74,7 @@ func TestFromTime(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			gotFrom, err := FromTime(tt.args.now, tt.args.binSize, tt.args.count)
 			if (err != nil) != tt.wantErr {
@@ -108,6 +109,7 @@ func TestRandomRange(t *testing.T) {
 	}
 	rand.Seed(time.Now().UnixNano())
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := RandomRange(tt.args.min, tt.args.max)
 			assert.NotEmpty(t, got)

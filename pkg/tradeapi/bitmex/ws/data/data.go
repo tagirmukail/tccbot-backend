@@ -35,7 +35,7 @@ type BitmexExchangeData struct {
 	GrossValue    int64      `json:"grossValue"`
 }
 
-type PositionData struct {
+type PositionData struct { // nolint:maligned
 	Account              int64     `json:"account"`
 	AvgCostPrice         float64   `json:"avgCostPrice"`
 	AvgEntryPrice        float64   `json:"avgEntryPrice"`
@@ -117,15 +117,14 @@ type PositionData struct {
 	TargetExcessMargin   int64     `json:"targetExcessMargin"`
 	TaxBase              int64     `json:"taxBase"`
 	TaxableMargin        int64     `json:"taxableMargin"`
-	//Timestamp            time.Time `json:"timestamp"`
-	Underlying         string  `json:"underlying"`
-	UnrealisedCost     int64   `json:"unrealisedCost"`
-	UnrealisedGrossPnl int64   `json:"unrealisedGrossPnl"`
-	UnrealisedPnl      *int64  `json:"unrealisedPnl"`
-	UnrealisedPnlPcnt  float64 `json:"unrealisedPnlPcnt"`
-	UnrealisedRoePcnt  float64 `json:"unrealisedRoePcnt"`
-	UnrealisedTax      int64   `json:"unrealisedTax"`
-	VarMargin          int64   `json:"varMargin"`
+	Underlying           string    `json:"underlying"`
+	UnrealisedCost       int64     `json:"unrealisedCost"`
+	UnrealisedGrossPnl   int64     `json:"unrealisedGrossPnl"`
+	UnrealisedPnl        *int64    `json:"unrealisedPnl"`
+	UnrealisedPnlPcnt    float64   `json:"unrealisedPnlPcnt"`
+	UnrealisedRoePcnt    float64   `json:"unrealisedRoePcnt"`
+	UnrealisedTax        int64     `json:"unrealisedTax"`
+	VarMargin            int64     `json:"varMargin"`
 }
 
 type BitmexIncomingData struct {

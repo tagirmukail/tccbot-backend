@@ -25,8 +25,8 @@ const (
 	timeReadSleep    = 3 * time.Second
 	handshakeTimeout = 3 * time.Second
 
-	bitmexWSUrl        = "wss://www.bitmex.com/realtime"
-	bitmexTestnetWSUrl = "wss://testnet.bitmex.com/realtime"
+	bitmexWSURL        = "wss://www.bitmex.com/realtime"
+	bitmexTestnetWSURL = "wss://testnet.bitmex.com/realtime"
 )
 
 type Receiver interface {
@@ -36,7 +36,7 @@ type WS struct {
 	log *logrus.Logger
 
 	ws      *recws.RecConn
-	connUrl string
+	connURL string
 
 	pingInterval int // ping interval in second
 	timeout      int // in second
@@ -60,11 +60,11 @@ func NewWS(
 	apiKey string,
 	apiSecret string,
 ) *WS {
-	var bitmexUrl string
+	var bitmexURL string
 	if test {
-		bitmexUrl = bitmexTestnetWSUrl
+		bitmexURL = bitmexTestnetWSURL
 	} else {
-		bitmexUrl = bitmexWSUrl
+		bitmexURL = bitmexWSURL
 	}
 
 	wsr := &WS{
@@ -76,7 +76,7 @@ func NewWS(
 			NonVerbose:       true,
 			HandshakeTimeout: handshakeTimeout,
 		},
-		connUrl:      bitmexUrl,
+		connURL:      bitmexURL,
 		pingInterval: ping,
 		timeout:      timeout,
 		theme:        theme,
@@ -86,7 +86,7 @@ func NewWS(
 		apiSecret:    apiSecret,
 	}
 
-	wsr.connUrl = bitmexUrl
+	wsr.connURL = bitmexURL
 	wsr.ws.SubscribeHandler = wsr.subscribeAuthHandler
 
 	return wsr
@@ -102,14 +102,14 @@ func (r *WS) Start(wgForeign *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
-	r.ws.Dial(r.connUrl, nil)
+	r.ws.Dial(r.connURL, nil)
 	err := r.ws.GetDialError()
 	if err != nil {
 		r.log.Fatalf("bitmex not connected, error: %v", err)
 	}
 	defer r.ws.Close()
 
-	r.log.Infof("connected to %s", r.connUrl)
+	r.log.Infof("connected to %s", r.connURL)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -142,7 +142,7 @@ func (r *WS) read(wg *sync.WaitGroup) {
 
 		switch mType {
 		case websocket.CloseMessage:
-			r.log.Infof("WS.read() %s websocket bitmex closed: %v", r.connUrl, string(msg))
+			r.log.Infof("WS.read() %s websocket bitmex closed: %v", r.connURL, string(msg))
 			continue
 		case websocket.TextMessage:
 			break
@@ -182,10 +182,6 @@ func (r *WS) read(wg *sync.WaitGroup) {
 
 }
 
-func (r *WS) subscribeHandler() error {
-	return r.subscribe()
-}
-
 func (r *WS) subscribeAuthHandler() error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
@@ -215,7 +211,7 @@ func (r *WS) subscribeAuthHandler() error {
 func (r *WS) subscribe() error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
-	var themes []types.Theme
+	var themes = make([]types.Theme, 0)
 	for _, theme := range r.theme {
 		if strings.Contains(string(theme), string(types.Trade)) {
 			theme = types.NewTemeWithPair(theme, r.symbol)
@@ -277,7 +273,7 @@ func (r *WS) ping(wg *sync.WaitGroup) {
 
 func buildSubscribeParams(symbol types.Symbol, themes []types.Theme) string {
 	params := url.Values{}
-	var subsParams []string
+	var subsParams = make([]string, 0)
 	for _, th := range themes {
 		subsParams = append(subsParams, string(types.NewTemeWithPair(th, symbol)))
 	}

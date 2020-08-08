@@ -38,7 +38,7 @@ const (
 	OrdNew             OrdStatus = "New"
 	OrdFilled          OrdStatus = "Filled"
 	OrdPartiallyFilled OrdStatus = "PartiallyFilled"
-	ordCanceled        OrdStatus = "Canceled"
+	OrdCanceled        OrdStatus = "Canceled"
 )
 
 type PriceType string

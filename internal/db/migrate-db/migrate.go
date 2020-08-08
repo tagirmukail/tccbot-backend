@@ -1,13 +1,12 @@
-package migrate_db
+package migratedb
 
 import (
-	"database/sql"
 	"errors"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3" // migrate
 	bindata "github.com/golang-migrate/migrate/v4/source/go_bindata"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // migrate
 
 	"github.com/tagirmukail/tccbot-backend/migrations"
 )
@@ -20,15 +19,8 @@ const (
 	STEP Command = "step"
 )
 
-func Migrate(dbPath string, db *sql.DB, command Command, step int) error {
-	// driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
-	// if err != nil {
-	// 	return err
-	// }
-
-	s := bindata.Resource(migrations.AssetNames(), func(name string) ([]byte, error) {
-		return migrations.Asset(name)
-	})
+func Migrate(dbPath string, command Command, step int) error {
+	s := bindata.Resource(migrations.AssetNames(), migrations.Asset)
 	d, err := bindata.WithInstance(s)
 	if err != nil {
 		return err

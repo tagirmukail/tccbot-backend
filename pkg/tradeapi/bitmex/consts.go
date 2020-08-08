@@ -1,7 +1,5 @@
 package bitmex
 
-import "time"
-
 const (
 	Unset EndpointLimit = iota
 	Auth
@@ -9,13 +7,12 @@ const (
 )
 
 const (
-	bitmexUrl  = "https://www.bitmex.com/api/v1"
-	testnetUrl = "https://testnet.bitmex.com/api/v1"
+	bitmexURL  = "https://www.bitmex.com/api/v1"
+	testnetURL = "https://testnet.bitmex.com/api/v1"
 
 	userAgent = "User-Agent"
 
-	maxRequests            int32 = 50
-	defaultIdleConnTimeout       = 15 * time.Second
+	maxRequests int32 = 50
 
 	TradeTimeFormat = "2006-01-02 15:04"
 )

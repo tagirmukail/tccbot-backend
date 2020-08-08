@@ -17,11 +17,11 @@ const (
 	TradeBucketedTimestampLayout = "2006-01-02T15:04:05.000Z"
 )
 
-type Api interface {
-	GetBitmex() BitmexApi
+type API interface {
+	GetBitmex() BitmexAPI
 }
 
-type BitmexApi interface {
+type BitmexAPI interface {
 	EnableTestNet()
 	GetWS() *ws.WS
 
@@ -43,18 +43,18 @@ type BitmexApi interface {
 	GetInstrument(params bitmex.InstrumentRequestParams) ([]bitmex.Instrument, error)
 }
 
-type TradeApi struct {
-	bitmex BitmexApi
+type TradeAPI struct {
+	bitmex BitmexAPI
 }
 
-func NewTradeApi(
+func NewTradeAPI(
 	bitmexKey,
 	bitmexSecret string,
 	log *logrus.Logger,
 	test bool,
 	ws *ws.WS,
-) *TradeApi {
-	tapi := &TradeApi{
+) *TradeAPI {
+	tapi := &TradeAPI{
 		bitmex: bitmex.New(
 			bitmexKey,
 			bitmexSecret,
@@ -74,6 +74,6 @@ func NewTradeApi(
 	return tapi
 }
 
-func (t *TradeApi) GetBitmex() BitmexApi {
+func (t *TradeAPI) GetBitmex() BitmexAPI {
 	return t.bitmex
 }

@@ -19,14 +19,13 @@ const (
 )
 
 type Signal struct {
+	BinSize            BinSize    `db:"bin"`
+	SignalType         SignalType `db:"signal_t"`
 	ID                 int64      `db:"id"`
 	N                  int        `db:"n"`
 	MACDFast           int        `db:"macd_fast"`
 	MACDSlow           int        `db:"macd_slow"`
 	MACDSig            int        `db:"macd_sig"`
-	BinSize            BinSize    `db:"bin"`
-	Timestamp          time.Time  `db:"timestamp"`
-	SignalType         SignalType `db:"signal_t"`
 	SignalValue        float64    `db:"signal_v"`
 	BBTL               float64    `db:"bbtl"` // bolinger band top line
 	BBML               float64    `db:"bbml"` // bolinger band middle line
@@ -35,6 +34,7 @@ type Signal struct {
 	MACDHistogramValue float64    `db:"macd_h_v"`
 	CreatedAt          int64      `db:"created_at"`
 	UpdatedAt          int64      `db:"updated_at"`
+	Timestamp          time.Time  `db:"timestamp"`
 }
 
 func (t SignalType) String() string {

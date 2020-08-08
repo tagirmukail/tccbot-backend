@@ -11,8 +11,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const maxPrev = 4
-
 type Filter interface {
 	Apply(ctx context.Context) types.Side
 }

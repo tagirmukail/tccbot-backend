@@ -21,13 +21,11 @@ const (
 	limitBalanceContracts = 200
 	limitMinOnOrderQty    = 100
 	liquidationPriceLimit = 1600
-
-	trailingOffset = 0.5
 )
 
 type OrderProcessor struct {
 	tickPeriod      time.Duration
-	api             tradeapi.Api
+	api             tradeapi.API
 	log             *logrus.Logger
 	cfg             *config.GlobalConfig
 	mx              sync.Mutex
@@ -35,7 +33,7 @@ type OrderProcessor struct {
 }
 
 func New(
-	api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger,
+	api tradeapi.API, cfg *config.GlobalConfig, log *logrus.Logger,
 ) *OrderProcessor {
 	rand.Seed(time.Now().UnixNano())
 	return &OrderProcessor{
@@ -123,47 +121,6 @@ func (o *OrderProcessor) PlaceOrder(
 	default:
 		return nil, fmt.Errorf("unknown exchange: %s", exchange)
 	}
-}
-
-// placeTrailingStopOrder - place stop order
-// example:{"ordType":"Stop","pegOffsetValue":-0.5,"pegPriceType":"TrailingStopPeg","orderQty":100,"side":"Sell","execInst":"LastPrice","symbol":"XBTUSD","text":"Submission from testnet.bitmex.com"}
-func (o *OrderProcessor) placeTrailingStopOrder(
-	clOrdID string,
-	side types.Side,
-	orderQty float64,
-	passive bool,
-) (order interface{}, err error) {
-	var offset float64
-	if side == types.SideBuy {
-		offset = trailingOffset
-	} else if side == types.SideSell {
-		offset = -trailingOffset
-	} else {
-		return nil, fmt.Errorf("unknown side: %v", side)
-	}
-
-	stopParams := &bitmex.OrderNewParams{
-		ClientOrderID:  clOrdID,
-		Symbol:         o.cfg.ExchangesSettings.Bitmex.Symbol,
-		OrderType:      string(types.Stop),
-		Side:           string(side),
-		PegPriceType:   string(types.TrailingStopPeg),
-		PegOffsetValue: offset,
-		OrderQty:       orderQty,
-		ExecInst:       string(types.MarkPriceExecInstType),
-	}
-	if passive {
-		stopParams.ExecInst = string(types.PassiveOrderExecInstType)
-	}
-
-	o.log.Infof("create trailing stop order params: %#v", stopParams)
-	order, err = o.api.GetBitmex().CreateOrder(stopParams)
-	if err != nil {
-		return nil, err
-	}
-	o.log.Debugf("trailing stop order placed: %#v", order)
-
-	return order, nil
 }
 
 func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, err error) {

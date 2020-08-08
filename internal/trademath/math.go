@@ -14,7 +14,7 @@ const (
 	WMAIndication
 )
 
-type Singals struct {
+type Signals struct {
 	SMA float64  // sma with period
 	WMA float64  // wma with period
 	EMA float64  // ema with period
@@ -49,8 +49,8 @@ func (c *Calc) CalcMACD(
 	inSlowPeriod int, inSlowMAType talib.MaType,
 	inSignalPeriod int, inSignalMAType talib.MaType,
 ) MACD {
-	macd, macdSig, macdHist := talib.MacdExt(values, inFastPeriod, inFastMAType, inSlowPeriod, inSlowMAType, inSignalPeriod, inSignalMAType)
-	//macd, macdSig, macdHist := talib.Macd(values, inFastPeriod, inSlowPeriod, inSignalPeriod)
+	macd, macdSig, macdHist := talib.MacdExt(values, inFastPeriod, inFastMAType, inSlowPeriod, inSlowMAType,
+		inSignalPeriod, inSignalMAType)
 
 	return MACD{
 		HistogramValue: RoundFloat(macdHist[len(macdHist)-1], 3),
@@ -150,9 +150,9 @@ func (c *Calc) CalculateRSI(values []float64, indication MAIndication) RSI {
 }
 
 // Deprecated
-func (c *Calc) CalculateSignals(values []float64) Singals {
+func (c *Calc) CalculateSignals(values []float64) Signals {
 	tl, ml, bl := c.BolingerBandCalc(values)
-	return Singals{
+	return Signals{
 		SMA: c.SMACalc(values),
 		WMA: c.WMACalc(values),
 		EMA: c.EMACalc(values),
@@ -172,12 +172,12 @@ func (c *Calc) CalcBB(values []float64, maType talib.MaType) (tlV, mlV, blV floa
 	return RoundFloat(tl[len(tl)-1], 4), RoundFloat(ml[len(ml)-1], 4), RoundFloat(bl[len(bl)-1], 4)
 }
 
-func (c *Calc) CalcSignals(values []float64, maType talib.MaType) Singals {
+func (c *Calc) CalcSignals(values []float64, maType talib.MaType) Signals {
 	tl, ml, bl := talib.BBands(values, len(values), 2, 2, maType)
 	sma := talib.Sma(values, len(values))
 	ema := talib.Ema(values, len(values))
 	wma := talib.Wma(values, len(values))
-	return Singals{
+	return Signals{
 		SMA: RoundFloat(sma[len(sma)-1], 4),
 		WMA: RoundFloat(wma[len(wma)-1], 4),
 		EMA: RoundFloat(ema[len(ema)-1], 4),

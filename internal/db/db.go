@@ -8,18 +8,18 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3" // comment
 	"github.com/sirupsen/logrus"
 
 	"github.com/tagirmukail/tccbot-backend/internal/config"
-	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
+	migrateDb "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
 const defaultRetryCount = 5
 
-type DBManager interface {
+type DatabaseManager interface {
 	Close() error
 
 	// Candles
@@ -31,7 +31,7 @@ type DBManager interface {
 	SaveSignal(data models.Signal) (int64, error)
 	//GetSignalsByBinSize(binSize models.BinSize) ([]*models.Signal, error)
 	//GetLastSignals(binSize models.BinSize, count int) ([]*models.Signal, error)
-	GetSignalsByTs(signalType models.SignalType, binSize models.BinSize, ts []time.Time) ([]*models.Signal, error)
+	GetSignalsByTS(signalType models.SignalType, binSize models.BinSize, ts []time.Time) ([]*models.Signal, error)
 	// CandlesWithSignals
 	//GetCandleWithSignals(id int64) (*models.CandleWithSignals, error)
 	//GetLastCandlesWithSignals(theme types.Theme, n int, limit int) ([]*models.CandleWithSignals, error)
@@ -72,7 +72,7 @@ type DB struct {
 }
 
 func NewDB(
-	cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command migrate_db.Command, step int,
+	cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command migrateDb.Command, step int,
 ) (*DB, error) {
 	var err error
 	manager := &DB{
@@ -102,7 +102,7 @@ func NewDB(
 		return nil, err
 	}
 
-	err = migrate_db.Migrate(cfg.DBPath, manager.db.DB, command, step)
+	err = migrateDb.Migrate(cfg.DBPath, command, step)
 	if err != nil && err != migrate.ErrNoChange {
 		return nil, err
 	}

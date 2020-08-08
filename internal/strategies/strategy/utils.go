@@ -2,7 +2,6 @@ package strategy
 
 import (
 	"errors"
-	"math"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -17,11 +16,6 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const (
-	limitMinOnOrderQty    = 100
-	limitBalanceContracts = 200
-)
-
 func checkCloses(candles []bitmex.TradeBuck) error {
 	for _, candle := range candles {
 		if candle.Close == 0 {
@@ -32,7 +26,7 @@ func checkCloses(candles []bitmex.TradeBuck) error {
 }
 
 func fetchCloses(candles []bitmex.TradeBuck) []float64 {
-	var result []float64
+	var result = make([]float64, 0, len(candles))
 	for _, candle := range candles {
 		if candle.Close == 0 {
 			continue
@@ -58,14 +52,14 @@ func (s *BBRSIStrategy) getCandles(binSize models.BinSize) ([]bitmex.TradeBuck, 
 	return candles, nil
 }
 
-func fetchTsFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
-	var result []time.Time
+func fetchTSFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
+	var result = make([]time.Time, 0, len(candles))
 	for _, candle := range candles {
-		candleTs, err := time.Parse(tradeapi.TradeBucketedTimestampLayout, candle.Timestamp)
+		candleTS, err := time.Parse(tradeapi.TradeBucketedTimestampLayout, candle.Timestamp)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, candleTs)
+		result = append(result, candleTS)
 	}
 	return result, nil
 }
@@ -79,7 +73,9 @@ func (s *BBRSIStrategy) fetchLastCandlesForBB(binSize string, candles []bitmex.T
 	return result
 }
 
-func getCandles(caches candlecache.Caches, binSize models.BinSize, count int) ([]bitmex.TradeBuck, error) {
+func getCandles( // nolint:unused,deadcode
+	caches candlecache.Caches, binSize models.BinSize, count int,
+) ([]bitmex.TradeBuck, error) {
 	startTime, err := utils.FromTime(time.Now().UTC(), binSize.String(), count)
 	if err != nil {
 		return nil, err
@@ -99,21 +95,4 @@ func placeBitmexOrder(
 
 	log.Infof("%s order placed: %#v", side, ord)
 	return nil
-}
-
-func findMaxAndMin(candles []bitmex.TradeBuck) (float64, float64) {
-	var (
-		max float64
-		min = math.MaxFloat64
-	)
-	closes := fetchCloses(candles)
-	for _, closeP := range closes {
-		if closeP > max {
-			max = closeP
-		}
-		if closeP < min {
-			min = closeP
-		}
-	}
-	return max, min
 }
