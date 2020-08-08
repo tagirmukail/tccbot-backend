@@ -1,0 +1,49 @@
+run:
+  timeout: 5m
+  concurrency: 4
+#  skip-dirs:
+#    - ^pkg
+
+linters:
+  enable-all: true
+  disable:
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - goerr113
+    # Useless linters
+    - godot
+    - godox
+    - gomnd
+    - dupl
+    - interfacer
+    - testpackage
+    - whitespace
+    - wsl
+
+linters-settings:
+  funlen:
+    lines: 80
+  lll:
+    line-length: 125
+
+issues:
+  exclude:
+    # Ignore underscores in test functions
+    - "use underscores in Go names; (?:func|type) (?:T|t)est"
+    # Ignore long functions in tests
+    - "Function '(?:T|t)est.*' is too long"
+    # Ignore Rollback errors
+    - "Error return value of `tx.Rollback` is not checked"
+    # Allow 'ApiKey' instead of 'APIKey'
+    - "`?ApiKey`? should be `?APIKey`?"
+
+#  exclude-rules:
+#    # Disable 'unused' because tests in these files contain 't.SkipNow' calls that makes 'unused' linter swear
+#    - path: actions?_test\.go
+#      linters:
+#        - unused
+
+  # Display all issues
+  max-issues-per-linter: 0
+  max-same-issues: 0

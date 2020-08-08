@@ -33,3 +33,13 @@ test-examples-tradeapi-bitmex:
 
 build-image:
 	docker build -t tccbot -f Dockerfile .
+
+lint:
+	docker run --rm -it \
+		-v $(shell go env GOCACHE):/cache/go \
+		-e GOCACHE=/cache/go \
+		-e GOLANGCI_LINT_CACHE=/cache/go \
+		-v $(shell go env GOPATH)/pkg:/go/pkg \
+		-w /app \
+		-v $(shell pwd):/app \
+		golangci/golangci-lint:v1.27.0-alpine golangci-lint run --config .golangci.yaml
