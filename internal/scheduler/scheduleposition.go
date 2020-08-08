@@ -106,7 +106,7 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 				o.log.Debugf("position already clear")
 				continue
 			}
-			expTime := currentPosition.Timestamp.UTC().Add(expirePositionDuration)
+			expTime := currentPosition.CurrentTimestamp.UTC().Add(expirePositionDuration)
 			now := time.Now().UTC()
 			if now.After(expTime) {
 				o.log.Debugf("position cleaned now")
