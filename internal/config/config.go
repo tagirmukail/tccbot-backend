@@ -23,10 +23,12 @@ type Scheduler struct {
 }
 
 type PositionScheduler struct {
-	Enable        bool
-	PriceTrailing float64
-	ProfitPnlDiff float64
-	LossPnlDiff   float64
+	Enable         bool
+	PriceTrailing  float64
+	ProfitCloseBTC float64
+	LossCloseBTC   float64
+	ProfitPnlDiff  float64
+	LossPnlDiff    float64
 }
 
 type StrategiesGlobConfig struct {
@@ -352,10 +354,12 @@ func ParseConfig(cfgFile string) (*GlobalConfig, error) { // nolint:funlen
 		},
 		Scheduler: Scheduler{
 			Position: PositionScheduler{
-				Enable:        viper.GetBool("scheduler.position.enable"),
-				PriceTrailing: viper.GetFloat64("scheduler.position.trailing_price"),
-				ProfitPnlDiff: viper.GetFloat64("scheduler.position.profit_pnl_diff"),
-				LossPnlDiff:   viper.GetFloat64("scheduler.position.loss_pnl_diff"),
+				Enable:         viper.GetBool("scheduler.position.enable"),
+				PriceTrailing:  viper.GetFloat64("scheduler.position.trailing_price"),
+				ProfitCloseBTC: viper.GetFloat64("scheduler.position.profit_close_btc"),
+				LossCloseBTC:   viper.GetFloat64("scheduler.position.loss_close_btc"),
+				ProfitPnlDiff:  viper.GetFloat64("scheduler.position.profit_pnl_diff"),
+				LossPnlDiff:    viper.GetFloat64("scheduler.position.loss_pnl_diff"),
 			},
 		},
 		DBPath:           viper.GetString("db_path"),

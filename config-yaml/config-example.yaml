@@ -98,8 +98,10 @@ scheduler:
   position:
     enable: true
     trailing_price: 5
-    profit_pnl_diff: 0.0002
-    loss_pnl_diff: 0.0001
+    profit_close_btc: 0.00001
+    loss_close_btc: 0.00008
+    profit_pnl_diff: 0.00005
+    loss_pnl_diff: 0.00002
 
 ord_proc_period_sec: 180
 db_path: sqlite3://tccbot_db?x-migrations-table=schema_migrations

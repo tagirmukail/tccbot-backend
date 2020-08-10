@@ -47,6 +47,9 @@ func New(
 func (o *OrderProcessor) SetPosition(p *bitmex.Position) {
 	o.mx.Lock()
 	defer o.mx.Unlock()
+	if p == nil {
+		return
+	}
 
 	if o.currentPosition == nil {
 		o.currentPosition = &bitmex.Position{}

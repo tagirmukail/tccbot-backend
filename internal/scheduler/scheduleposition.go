@@ -172,9 +172,9 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 		//unrealisedPnl := trademath.ConvertToBTC(position.UnrealisedPnl)
 		o.log.Debugf("current position [unrealised pnl in btc]: %.9f", unrealisedPnl)
 		var pnlType = Neutral
-		if unrealisedPnl >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
+		if unrealisedPnl >= o.cfg.Scheduler.Position.ProfitCloseBTC {
 			pnlType = Profit
-		} else if unrealisedPnl <= -o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC*0.3 {
+		} else if unrealisedPnl <= -o.cfg.Scheduler.Position.LossCloseBTC {
 			pnlType = Loss
 		}
 
@@ -219,6 +219,8 @@ func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 			"pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
+	case o.pnlT.t == Neutral && p.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.LossPnlDiff):
+		placeOrder = true
 	case o.pnlT.t == Neutral && p.t == Loss:
 		o.log.Debugf("[o.pnlT.t == Neutral && p.t == Loss] we are waiting to check the position, "+
 			"[pnlT]: %#v, [p]: %#v",
