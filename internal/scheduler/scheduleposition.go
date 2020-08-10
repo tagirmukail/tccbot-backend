@@ -152,18 +152,29 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 			continue
 		}
 
-		if position.UnrealisedPnl == 0 || positionData.CurrentQty == 0 {
+		if positionData.CurrentQty == 0 {
 			continue
 		}
 
 		o.orderProc.SetPosition(position)
 
-		unrealisedPnl := trademath.ConvertToBTC(position.UnrealisedPnl)
+		pos, ok := o.orderProc.GetPosition()
+		if !ok || pos.AvgCostPrice == 0 {
+			o.log.Errorln("o.orderProc.GetPosition() empty position or avg cost price")
+			continue
+		}
+
+		o.log.Debugf("calculate unrealized PNL, "+
+			"[avgCostPrice]:%v, [lastPrice]:%v, [currentQty]:%v",
+			pos.AvgCostPrice, pos.LastPrice, pos.CurrentQty)
+
+		unrealisedPnl := trademath.CalculateUnrealizedPNL(pos.AvgCostPrice, pos.LastPrice, pos.CurrentQty)
+		//unrealisedPnl := trademath.ConvertToBTC(position.UnrealisedPnl)
 		o.log.Debugf("current position [unrealised pnl in btc]: %.9f", unrealisedPnl)
 		var pnlType = Neutral
 		if unrealisedPnl >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
 			pnlType = Profit
-		} else if unrealisedPnl <= -o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC/3 {
+		} else if unrealisedPnl <= -o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC*0.3 {
 			pnlType = Loss
 		}
 

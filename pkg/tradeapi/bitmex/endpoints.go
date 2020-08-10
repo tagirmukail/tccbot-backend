@@ -119,7 +119,7 @@ func (b *Bitmex) GetPositions(params PositionGetParams) ([]Position, error) {
 	return positions, b.SendAuthenticatedRequest(
 		http.MethodGet,
 		endpointPosition,
-		params,
+		params.toURLVals(),
 		&positions,
 	)
 }

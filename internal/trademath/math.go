@@ -306,3 +306,8 @@ func ConvertToBTC(b int64) float64 {
 func ConvertFromBTCToContracts(balance float64) float64 {
 	return balance * SatoshisPerBTC
 }
+
+func CalculateUnrealizedPNL(openPrice, lastPrice float64, contractsCount int64) float64 {
+	result := (1/openPrice - 1/lastPrice) * float64(contractsCount)
+	return RoundFloat(result, 8)
+}

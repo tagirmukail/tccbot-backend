@@ -271,3 +271,62 @@ func TestCalc_CalculateMACD(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateUnrealizedPNL(t *testing.T) {
+	type args struct {
+		openPrice      float64
+		lastPrice      float64
+		contractcCount int64
+	}
+	tests := []struct {
+		name string
+		args args
+		want float64
+	}{
+		{
+			name: "long - profit",
+			args: args{
+				openPrice:      8000,
+				lastPrice:      9000,
+				contractcCount: 100,
+			},
+			want: 0.0013889,
+		},
+		{
+			name: "long - loss",
+			args: args{
+				openPrice:      9000,
+				lastPrice:      8000,
+				contractcCount: 100,
+			},
+			want: -0.0013889,
+		},
+		{
+			name: "short - profit",
+			args: args{
+				openPrice:      9000,
+				lastPrice:      8000,
+				contractcCount: -100,
+			},
+			want: 0.0013889,
+		},
+		{
+			name: "short - loss",
+			args: args{
+				openPrice:      8000,
+				lastPrice:      9000,
+				contractcCount: -100,
+			},
+			want: -0.0013889,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CalculateUnrealizedPNL(
+				tt.args.openPrice, tt.args.lastPrice, tt.args.contractcCount); got != tt.want {
+				t.Errorf("CalculateUnrealizedPNL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -277,6 +277,20 @@ type PositionGetParams struct {
 	Filter string `json:"filter,omitempty"`
 }
 
+func (p *PositionGetParams) toURLVals() url.Values {
+	vals := url.Values{}
+	if p.Columns != "" {
+		vals.Add("columns", p.Columns)
+	}
+	if p.Count != 0 {
+		vals.Add("count", strconv.Itoa(int(p.Count)))
+	}
+	if p.Filter != "" {
+		vals.Add("filter", p.Filter)
+	}
+	return vals
+}
+
 // InstrumentRequestParams contains all the parameters for some general functions
 type InstrumentRequestParams struct {
 	// Columns - [Optional] Array of column names to fetch. If omitted, will

@@ -47,7 +47,32 @@ func New(
 func (o *OrderProcessor) SetPosition(p *bitmex.Position) {
 	o.mx.Lock()
 	defer o.mx.Unlock()
-	o.currentPosition = p
+
+	if o.currentPosition == nil {
+		o.currentPosition = &bitmex.Position{}
+	}
+
+	var avgPrice = o.currentPosition.AvgCostPrice
+	if o.currentPosition.CurrentQty != p.CurrentQty || o.currentPosition.LiquidationPrice != p.LiquidationPrice {
+		o.currentPosition = p
+	}
+
+	if avgPrice == 0 || p.AvgCostPrice == 0 {
+		symbol := o.currentPosition.Symbol
+		if symbol == "" {
+			symbol = p.Symbol
+		}
+		position, err := o.getPosition(symbol)
+		if err != nil {
+			o.log.Errorf("OrderProcessor.getPosition() failed: %v", err)
+			return
+		}
+
+		o.currentPosition.AvgCostPrice = position.AvgCostPrice
+		o.currentPosition.AvgEntryPrice = position.AvgEntryPrice
+		o.currentPosition.LastPrice = position.LastPrice
+		o.currentPosition.CurrentQty = position.CurrentQty
+	}
 }
 
 func (o *OrderProcessor) GetPosition() (*bitmex.Position, bool) {
@@ -156,6 +181,23 @@ func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
 		return resp, errors.New("instruments not exist")
 	}
 	return insts[0], nil
+}
+
+func (o *OrderProcessor) getPosition(symbol string) (bitmex.Position, error) {
+	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
+		Columns: "avgCostPrice,avgEntryPrice,currentQty,lastPrice",
+	})
+	if err != nil {
+		return bitmex.Position{}, err
+	}
+
+	for _, pos := range positions {
+		if pos.Symbol == symbol {
+			return pos, nil
+		}
+	}
+
+	return bitmex.Position{}, nil
 }
 
 func (o *OrderProcessor) checkLimitContracts(side types.Side) error {

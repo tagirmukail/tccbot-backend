@@ -155,14 +155,22 @@ func (b *Bitmex) SendAuthenticatedRequest(
 	headers["api-key"] = b.key
 
 	var data string
+	var uri = b.url + path
 	if params != nil {
-		bData, err := json.Marshal(params)
-		if err != nil {
-			return err
-		}
-		data = string(bData)
-		if b.verbose {
-			b.logger.Infof("request params: %s", data)
+		if urlValues, ok := params.(url.Values); !ok {
+			bData, err := json.Marshal(params)
+			if err != nil {
+				return err
+			}
+			data = string(bData)
+			if b.verbose {
+				b.logger.Infof("request params: %s", data)
+			}
+		} else {
+			encodeParams := urlValues.Encode()
+			path += "?" + encodeParams
+			uri += "?" + encodeParams
+
 		}
 	}
 	hmac := crypto.GetHashMessage(crypto.HashSHA256,
@@ -172,7 +180,7 @@ func (b *Bitmex) SendAuthenticatedRequest(
 
 	if err := b.do(&Request{
 		Method:      verb,
-		Path:        b.url + path,
+		Path:        uri,
 		Headers:     headers,
 		Body:        bytes.NewBuffer([]byte(data)),
 		Response:    &response,
