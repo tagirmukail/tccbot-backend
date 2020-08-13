@@ -27,6 +27,7 @@ const (
 	Limit           OrderType = "Limit"
 	Market          OrderType = "Market"
 	StopLimit       OrderType = "StopLimit"
+	Stop            OrderType = "Stop"
 	LimitIfTouched  OrderType = "LimitIfTouched"
 	MarketIfTouched OrderType = "MarketIfTouched"
 )
@@ -37,21 +38,31 @@ const (
 	OrdNew             OrdStatus = "New"
 	OrdFilled          OrdStatus = "Filled"
 	OrdPartiallyFilled OrdStatus = "PartiallyFilled"
-	ordCanceled        OrdStatus = "Canceled"
+	OrdCanceled        OrdStatus = "Canceled"
 )
 
 type PriceType string
 
 const (
 	TrailingStopPeg PriceType = "TrailingStopPeg"
-	LastPrice       PriceType = "LastPrice"
+)
+
+type ExecInstType string
+
+const (
+	MarkPriceExecInstType    ExecInstType = "MarkPrice"
+	LastPriceExecInstType    ExecInstType = "LastPrice"
+	PassiveOrderExecInstType ExecInstType = "ParticipateDoNotInitiate"
 )
 
 type Theme string
 
 const (
 	Instrument Theme = "instrument"
+	Position   Theme = "position"
 	Trade      Theme = "trade"
+	Order      Theme = "order"
+	Margin     Theme = "margin"
 	TradeBin1m Theme = "tradeBin1m"
 	TradeBin5m Theme = "tradeBin5m"
 	TradeBin1h Theme = "tradeBin1h"
@@ -78,5 +89,17 @@ func NewSubscribeMsg(op Operation, args []Theme) *SubscribeMsg {
 	return &SubscribeMsg{
 		Op:   op,
 		Args: args,
+	}
+}
+
+type AuthMsg struct {
+	Op   Operation     `json:"op"` // operation
+	Args []interface{} `json:"args"`
+}
+
+func NewAuthMsg(apiKey, signature string, expires interface{}) *AuthMsg {
+	return &AuthMsg{
+		Op:   "authKeyExpires",
+		Args: []interface{}{apiKey, expires, signature},
 	}
 }

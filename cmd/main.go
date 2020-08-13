@@ -11,6 +11,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
+
+	bitmextradedata "github.com/tagirmukail/tccbot-backend/internal/tradedata/bitmex"
+
 	migrate_db "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
@@ -41,12 +45,15 @@ var (
 	GitHash   string
 )
 
-// TODO новая арбитражная стратегия - выставлять сразу и на покупку и на продажу при срабатывании сигналов, и при необходимости перевыставлять,
+// TODO новая арбитражная стратегия - выставлять сразу и на покупку и на продажу при срабатывании сигналов,
+//  и при необходимости перевыставлять,
 //  учитывать при выставлении в какую сторону сработали сигналы, учитывать доступный балан и позицию
 
 //  atr signal/ strategy ( Awesome Oscillator + Accelerator Oscillator + Parabolic SAR)
 
-func main() {
+// TODO попробовать пакет кобра для запуска команд
+// TODO вынести инициализацию зависимостей бота отдельно
+func main() { // nolint:funlen
 	var (
 		configPath       string
 		logLevel         uint
@@ -98,7 +105,8 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	log, err := logger.New(logLevel, logDir, &logrus.TextFormatter{DisableColors: false, ForceColors: true, FullTimestamp: true})
+	log, err := logger.New(logLevel, logDir,
+		&logrus.TextFormatter{DisableColors: false, ForceColors: true, FullTimestamp: true})
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -112,7 +120,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var dbManager db.DBManager
+	var dbManager db.DatabaseManager
 	dbManager, err = db.NewDB(cfg, nil, log, migrate_db.Command(migrationCommand), step)
 	if err != nil {
 		log.Fatalf("migartion failed: %v", err)
@@ -122,13 +130,17 @@ func main() {
 		return
 	}
 
-	var themes = cfg.GlobStrategies.GetThemes()
+	var tradeThemes = cfg.GlobStrategies.GetThemes()
 
-	tradeApi := tradeapi.NewTradeApi(
-		cfg.Accesses.Bitmex.Key,
-		cfg.Accesses.Bitmex.Secret,
-		cfg.Accesses.Bitmex.Testnet.Key,
-		cfg.Accesses.Bitmex.Testnet.Secret,
+	bitmexKey, bitmexSecret := cfg.Accesses.Bitmex.Key, cfg.Accesses.Bitmex.Secret
+	if testMode {
+		bitmexKey, bitmexSecret = cfg.Accesses.Bitmex.Testnet.Key, cfg.Accesses.Bitmex.Testnet.Secret
+
+	}
+
+	tradeAPI := tradeapi.NewTradeAPI(
+		bitmexKey,
+		bitmexSecret,
 		log,
 		testMode,
 		ws.NewWS(
@@ -137,12 +149,16 @@ func main() {
 			cfg.ExchangesSettings.Bitmex.PingSec,
 			cfg.ExchangesSettings.Bitmex.TimeoutSec,
 			uint32(cfg.ExchangesSettings.Bitmex.RetrySec),
-			themes,
+			append([]types.Theme{types.Position}, tradeThemes...),
 			types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol),
+			bitmexKey,
+			bitmexSecret,
 		),
 	)
 
-	ordProc := orderproc.New(tradeApi, cfg, log)
+	var bitmexSubscribers []*bitmextradedata.Subscriber
+
+	ordProc := orderproc.New(tradeAPI, cfg, log)
 
 	caches := candlecache.NewBinToCache(
 		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,
@@ -151,11 +167,25 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
+	bitmexSubsTradeForStrategies := bitmextradedata.NewSubscriber(tradeThemes)
+	bitmexSubscribers = append(bitmexSubscribers, bitmexSubsTradeForStrategies)
+
+	var schedulr scheduler.Scheduler
+	if cfg.Scheduler.Position.Enable {
+		bitmexSubsForScheduler := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
+		bitmexSubscribers = append(bitmexSubscribers, bitmexSubsForScheduler)
+		schedulr = scheduler.NewPositionScheduler(
+			cfg, scheduler.LimitPositionPnls, tradeAPI, ordProc, bitmexSubsForScheduler, log,
+		)
+	}
+
+	bitmexDataSender := bitmextradedata.New(tradeAPI.GetBitmex().GetWS().GetMessages(), log, bitmexSubscribers...)
+
+	bbRsi := strategy.NewBBRSIStrategy(cfg, tradeAPI, ordProc, dbManager, caches, log)
+
 	wg := &sync.WaitGroup{}
-	strategiesTypes := strategies.New(wg, cfg, tradeApi, ordProc, dbManager, log, initSignals,
-		strategy.NewBBRSIStrategy(cfg, tradeApi, ordProc, dbManager, caches, log),
-		caches,
-	)
+	strategiesTypes := strategies.New(wg, cfg, tradeAPI, ordProc, bitmexDataSender, bitmexSubsTradeForStrategies,
+		schedulr, dbManager, log, initSignals, bbRsi, caches)
 	strategiesTypes.Start()
 	<-done
 
@@ -166,7 +196,7 @@ func main() {
 func setPidEnv() error {
 	pid := strconv.Itoa(os.Getpid())
 
-	err := ioutil.WriteFile(PidEnvKey, []byte(pid), 0666)
+	err := ioutil.WriteFile(PidEnvKey, []byte(pid), 0600)
 	if err != nil {
 		return err
 	}
@@ -176,7 +206,7 @@ func setPidEnv() error {
 }
 
 func killIfRun() error {
-	f, err := os.OpenFile(PidEnvKey, os.O_RDONLY|os.O_CREATE, 0666)
+	f, err := os.OpenFile(PidEnvKey, os.O_RDONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}

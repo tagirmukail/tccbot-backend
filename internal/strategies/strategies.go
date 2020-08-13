@@ -7,6 +7,10 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
+
+	bitmextradedata "github.com/tagirmukail/tccbot-backend/internal/tradedata/bitmex"
+
 	"github.com/tagirmukail/tccbot-backend/internal/candlecache"
 
 	"github.com/sirupsen/logrus"
@@ -22,45 +26,56 @@ import (
 )
 
 type Strategies struct {
-	wgRunner    *sync.WaitGroup
-	cfg         *config.GlobalConfig
-	tradeApi    tradeapi.Api
-	db          db.DBManager
-	log         *logrus.Logger
-	tradeCalc   trademath.Calc
-	orderProc   *orderproc.OrderProcessor
 	initSignals bool
 	rsiPrev     struct {
 		minBorderInProc bool
 		maxBorderInProc bool
 	}
+	wgRunner              *sync.WaitGroup
+	cfg                   *config.GlobalConfig
+	tradeAPI              tradeapi.API
+	db                    db.DatabaseManager
+	log                   *logrus.Logger
+	tradeCalc             trademath.Calc
+	orderProc             *orderproc.OrderProcessor
+	bitmexDataSender      *bitmextradedata.Sender
+	bitmexTradeSubscriber *bitmextradedata.Subscriber
+	schedulr              scheduler.Scheduler
+
 	candlesCaches candlecache.Caches
 
 	bbRsi strategy.Strategy
 }
 
+// TODO перенести все параметры в отдельную структуру
 func New(
 	wgRunner *sync.WaitGroup,
 	cfg *config.GlobalConfig,
-	tradeApi tradeapi.Api,
+	tradeAPI tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
-	db db.DBManager,
+	bitmexDataSender *bitmextradedata.Sender,
+	bitmexTradeSubscriber *bitmextradedata.Subscriber,
+	schedulr scheduler.Scheduler,
+	db db.DatabaseManager,
 	log *logrus.Logger,
 	initSignals bool,
 	bbStrategy strategy.Strategy,
 	candlesCaches candlecache.Caches,
 ) *Strategies {
 	return &Strategies{
-		wgRunner:      wgRunner,
-		cfg:           cfg,
-		tradeApi:      tradeApi,
-		orderProc:     orderProc,
-		db:            db,
-		log:           log,
-		tradeCalc:     trademath.Calc{},
-		initSignals:   initSignals,
-		bbRsi:         bbStrategy,
-		candlesCaches: candlesCaches,
+		wgRunner:              wgRunner,
+		cfg:                   cfg,
+		tradeAPI:              tradeAPI,
+		orderProc:             orderProc,
+		bitmexDataSender:      bitmexDataSender,
+		bitmexTradeSubscriber: bitmexTradeSubscriber,
+		schedulr:              schedulr,
+		db:                    db,
+		log:                   log,
+		tradeCalc:             trademath.Calc{},
+		initSignals:           initSignals,
+		bbRsi:                 bbStrategy,
+		candlesCaches:         candlesCaches,
 	}
 }
 
@@ -70,17 +85,26 @@ func (s *Strategies) Start() {
 		s.log.Fatalf("SignalsInit failed: %v", err)
 	}
 	s.wgRunner.Add(1)
-	go s.start()
+	go s.start(s.wgRunner)
+	if s.schedulr != nil {
+		s.wgRunner.Add(1)
+		go s.schedulr.Start(s.wgRunner)
+	}
+
 	s.wgRunner.Add(1)
-	go s.orderProc.Start(s.wgRunner)
+	go s.bitmexDataSender.SendToSubscribers(s.wgRunner)
+
+	s.wgRunner.Add(1)
+	go s.tradeAPI.GetBitmex().GetWS().Start(s.wgRunner)
 	s.wgRunner.Wait()
+
+	if s.schedulr != nil {
+		_ = s.schedulr.Stop()
+	}
 }
 
-func (s *Strategies) start() {
-	defer s.wgRunner.Done()
-
-	s.wgRunner.Add(1)
-	go s.tradeApi.GetBitmex().GetWS().Start(s.wgRunner)
+func (s *Strategies) start(wg *sync.WaitGroup) { // nolint:gocognit
+	defer wg.Done()
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
@@ -91,7 +115,7 @@ func (s *Strategies) start() {
 		case <-done:
 			s.log.Infof("process messages stopped")
 			return
-		case data := <-s.tradeApi.GetBitmex().GetWS().GetMessages():
+		case data := <-s.bitmexTradeSubscriber.GetMsgChan():
 			if len(data.Data) == 0 {
 				s.log.Debug("empty data from ws")
 				continue

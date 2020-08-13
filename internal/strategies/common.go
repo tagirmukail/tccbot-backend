@@ -2,24 +2,15 @@ package strategies
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/tagirmukail/tccbot-backend/internal/trademath"
-
-	"github.com/tagirmukail/tccbot-backend/internal/types"
-	"github.com/tagirmukail/tccbot-backend/internal/utils"
-
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
-
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-const limitMinOnOrderQty = 100
-
 func (s *Strategies) fetchCloses(candles []bitmex.TradeBuck) []float64 {
-	var result []float64
+	var result = make([]float64, 0, len(candles))
 	for _, candle := range candles {
 		if candle.Close == 0 {
 			continue
@@ -29,28 +20,19 @@ func (s *Strategies) fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	return result
 }
 
-func (s *Strategies) fetchTsFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
-	var result []time.Time
+func (s *Strategies) fetchTSFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) { // nolint:unused
+	var result = make([]time.Time, 0, len(candles))
 	for _, candle := range candles {
-		candleTs, err := time.Parse(tradeapi.TradeBucketedTimestampLayout, candle.Timestamp)
+		candleTS, err := time.Parse(tradeapi.TradeBucketedTimestampLayout, candle.Timestamp)
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, candleTs)
+		result = append(result, candleTS)
 	}
 	return result, nil
 }
 
-func (s *Strategies) fetchLastCandlesForBB(binSize string, candles []bitmex.TradeBuck) []bitmex.TradeBuck {
-	lastIndx := len(candles) - s.cfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount
-	if lastIndx < 0 {
-		return nil
-	}
-	var result = candles[lastIndx:]
-	return result
-}
-
-func (s *Strategies) retryProcess(
+func (s *Strategies) retryProcess( // nolint:unused
 	candles []bitmex.TradeBuck,
 	binSize models.BinSize,
 	retryFunc func(candles []bitmex.TradeBuck, binSize models.BinSize) error,
@@ -75,8 +57,8 @@ func (s *Strategies) checkCloses(candles []bitmex.TradeBuck) error {
 	return nil
 }
 
-func (s *Strategies) fetchMacdVals(signals []*models.Signal) []float64 {
-	var result []float64
+func (s *Strategies) fetchMacdVals(signals []*models.Signal) []float64 { // nolint:unused
+	var result = make([]float64, 0, len(signals))
 	for _, signal := range signals {
 		if signal.MACDValue == 0 {
 			continue
@@ -86,7 +68,7 @@ func (s *Strategies) fetchMacdVals(signals []*models.Signal) []float64 {
 	return result
 }
 
-func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int {
+func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int { // nolint:unused
 	switch size {
 	case models.Bin5m:
 		return 6
@@ -97,27 +79,4 @@ func (s *Strategies) macdTimeFrameDefine(size models.BinSize) int {
 	default:
 		return 0
 	}
-}
-
-func (s *Strategies) placeBitmexOrder(side types.Side, signalType models.SignalType) error {
-	_, balance, err := s.orderProc.GetBalance()
-	if err != nil {
-		s.log.Warnf("orderProc.GetBalance failed: %v", err)
-		return err
-	}
-	contracts := trademath.ConvertFromBTCToContracts(balance)
-	if contracts <= 3 {
-		return fmt.Errorf("balance is exhausted, %.3f left", balance)
-	}
-
-	amount := utils.RandomRange(limitMinOnOrderQty, s.cfg.ExchangesSettings.Bitmex.MaxAmount)
-
-	ord, err := s.orderProc.PlaceOrder(types.Bitmex, side, amount, false, false, 0, 0)
-	if err != nil {
-		s.log.Warnf("orderProc.PlaceOrder failed: %v", err)
-		return err
-	}
-
-	s.log.Infof("sell order placed: %#v", ord)
-	return nil
 }

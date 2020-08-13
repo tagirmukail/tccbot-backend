@@ -12,20 +12,21 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-func (s *Strategies) processMACDStrategy(binSize string) error {
+func (s *Strategies) processMACDStrategy(binSize string) error { // nolint:funlen,unused
 	bin, err := models.ToBinSize(binSize)
 	if err != nil {
 		return err
 	}
 
-	count := s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount + s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount
+	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
+	count := cfg.MacdSlowCount + cfg.MacdSigCount
 
 	fromTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
 	if err != nil {
 		return err
 	}
 
-	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
+	candles, err := s.tradeAPI.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
 		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     int32(count),
@@ -40,12 +41,15 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 		return errors.New("all candles invalid")
 	}
 
-	lastCandleTs, err := time.Parse(
+	lastCandleTS, err := time.Parse(
 		tradeapi.TradeBucketedTimestampLayout,
 		candles[len(candles)-1].Timestamp,
 	)
+	if err != nil {
+		return err
+	}
 
-	timestamps, err := s.fetchTsFromCandles(candles)
+	timestamps, err := s.fetchTSFromCandles(candles)
 	if err != nil {
 		return err
 	}
@@ -61,7 +65,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 		MACDSlow:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount,
 		MACDSig:            s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount,
 		BinSize:            bin,
-		Timestamp:          lastCandleTs,
+		Timestamp:          lastCandleTS,
 		SignalType:         models.MACD,
 		SignalValue:        macd.Sig,
 		MACDValue:          macd.Value,
@@ -97,13 +101,13 @@ func (s *Strategies) processMACDStrategy(binSize string) error {
 }
 
 // TODO test this
-func (s *Strategies) processMACDSignals(
+func (s *Strategies) processMACDSignals( // nolint:unused
 	binSize models.BinSize, timestamps []time.Time, candles []bitmex.TradeBuck,
 ) (result struct {
 	bearDiverg bool
 	bullDiverg bool
 }, err error) {
-	signals, err := s.db.GetSignalsByTs(models.MACD, binSize, timestamps)
+	signals, err := s.db.GetSignalsByTS(models.MACD, binSize, timestamps)
 	if err != nil {
 		return result, err
 	}
@@ -137,7 +141,7 @@ func (s *Strategies) processMACDSignals(
 	return result, nil
 }
 
-func (s *Strategies) validateDefineMechanism(
+func (s *Strategies) validateDefineMechanism( // nolint:unused
 	fCandles []*bitmex.TradeBuck, signals []*models.Signal,
 ) error {
 	if len(signals) == 0 || len(fCandles) == 0 {
@@ -150,7 +154,7 @@ func (s *Strategies) validateDefineMechanism(
 	return nil
 }
 
-func (s *Strategies) defineBullDivergence(
+func (s *Strategies) defineBullDivergence( // nolint:unused
 	binSize models.BinSize, fCandles []*bitmex.TradeBuck, signals []*models.Signal,
 ) (bool, error) {
 	err := s.validateDefineMechanism(fCandles, signals)
@@ -242,7 +246,7 @@ func (s *Strategies) findTwoMin(tframe int, signals []*models.Signal) (result st
 	return result, err
 }
 
-func (s *Strategies) defineBearDivergence(
+func (s *Strategies) defineBearDivergence( // nolint:unused
 	binSize models.BinSize, fCandles []*bitmex.TradeBuck, signals []*models.Signal,
 ) (bool, error) {
 	err := s.validateDefineMechanism(fCandles, signals)
@@ -339,7 +343,7 @@ func (s *Strategies) findTwoMax(tframe int, signals []*models.Signal) (result st
 	return result, err
 }
 
-func (s *Strategies) filterCandlesBySignals(
+func (s *Strategies) filterCandlesBySignals( // nolint:unused
 	candles []bitmex.TradeBuck, signals []*models.Signal,
 ) ([]*bitmex.TradeBuck, error) {
 	var filteredCandles = make([]*bitmex.TradeBuck, len(signals))
@@ -350,7 +354,8 @@ func (s *Strategies) filterCandlesBySignals(
 				return nil, err
 			}
 			if timestamp.Equal(signal.Timestamp) {
-				filteredCandles[i] = &candle
+				copyCandle := candle
+				filteredCandles[i] = &copyCandle
 				break
 			}
 		}

@@ -174,6 +174,7 @@ func TestStrategies_findTwoMax(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			s := &Strategies{}
 			gotResult, err := s.findTwoMax(tt.args.tframe, tt.args.signals)
@@ -294,6 +295,7 @@ func TestStrategies_findTwoMin(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			s := &Strategies{}
 			gotResult, err := s.findTwoMin(tt.args.tframe, tt.args.signals)

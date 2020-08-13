@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"os"
-	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -21,23 +18,23 @@ import (
 )
 
 const (
-	PassiveOrderType      = "ParticipateDoNotInitiate"
 	limitBalanceContracts = 200
 	limitMinOnOrderQty    = 100
 	liquidationPriceLimit = 1600
-
-	trailingOffset = 5
 )
 
 type OrderProcessor struct {
 	tickPeriod      time.Duration
-	api             tradeapi.Api
+	api             tradeapi.API
 	log             *logrus.Logger
 	cfg             *config.GlobalConfig
-	currentPosition bitmex.Position
+	mx              sync.Mutex
+	currentPosition *bitmex.Position
 }
 
-func New(api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger) *OrderProcessor {
+func New(
+	api tradeapi.API, cfg *config.GlobalConfig, log *logrus.Logger,
+) *OrderProcessor {
 	rand.Seed(time.Now().UnixNano())
 	return &OrderProcessor{
 		tickPeriod: time.Duration(cfg.OrdProcPeriodSec) * time.Second,
@@ -47,130 +44,44 @@ func New(api tradeapi.Api, cfg *config.GlobalConfig, log *logrus.Logger) *OrderP
 	}
 }
 
-func (o *OrderProcessor) Start(wg *sync.WaitGroup) {
-	o.log.Infof("order processor started")
-	defer func() {
-		o.log.Infof("order processor finished")
-		wg.Done()
-	}()
+func (o *OrderProcessor) SetPosition(p *bitmex.Position) {
+	o.mx.Lock()
+	defer o.mx.Unlock()
+	if p == nil {
+		return
+	}
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
+	if o.currentPosition == nil {
+		o.currentPosition = &bitmex.Position{}
+	}
 
-	tick := time.NewTicker(o.tickPeriod)
-	defer tick.Stop()
-	for {
-		select {
-		case <-done:
-			return
-		case <-tick.C:
-			err := o.procActiveOrders()
-			if err != nil {
-				o.log.Warnf("procActiveOrders failed: %v", err)
-			}
-			err = o.processPosition()
-			if err != nil {
-				o.log.Warnf("processPosition failed: %v", err)
-			}
+	var avgPrice = o.currentPosition.AvgCostPrice
+	if o.currentPosition.CurrentQty != p.CurrentQty || o.currentPosition.LiquidationPrice != p.LiquidationPrice {
+		o.currentPosition = p
+	}
+
+	if avgPrice == 0 || p.AvgCostPrice == 0 {
+		symbol := o.currentPosition.Symbol
+		if symbol == "" {
+			symbol = p.Symbol
 		}
-	}
-
-}
-
-func (o *OrderProcessor) processPosition() error {
-	o.log.Info("\n===============================\nstart process position")
-	defer o.log.Info("finish process position\n===============================\n")
-
-	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
-		Filter: fmt.Sprintf(`{"symbol": "%s"}`, o.cfg.ExchangesSettings.Bitmex.Symbol),
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(positions) == 0 {
-		o.currentPosition = bitmex.Position{}
-	}
-
-	for _, position := range positions {
-		if position.Symbol == o.cfg.ExchangesSettings.Bitmex.Symbol {
-			o.currentPosition = position
-		}
-		if trademath.ConvertToBTC(position.UnrealisedPnl) >= o.cfg.ExchangesSettings.Bitmex.ClosePositionMinBTC {
-			if position.OpeningQty > 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideSell, math.Abs(float64(position.OpeningQty)), true, false, 0, 0)
-				if err != nil {
-					return err
-				}
-			} else if position.OpeningQty < 0 {
-				_, err := o.PlaceOrder(types.Bitmex, types.SideBuy, math.Abs(float64(position.OpeningQty)), true, false, 0, 0)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-
-	return nil
-}
-
-func (o *OrderProcessor) procActiveOrders() error {
-	o.log.Infof("\n===============================\nstart process active orders")
-	defer o.log.Infof("finish process active orders\n===============================\n")
-
-	filter := fmt.Sprintf(`{"open": %t}`, true)
-	orders, err := o.api.GetBitmex().GetOrders(&bitmex.OrdersRequest{
-		Symbol: o.cfg.ExchangesSettings.Bitmex.Symbol,
-		Filter: filter,
-	})
-	if err != nil {
-		return err
-	}
-
-	// cancel a trailing stop order if it is left alone and position is no open
-	if len(orders) == 1 && orders[0].OrdType == string(types.LimitIfTouched) && !o.currentPosition.IsOpen {
-		cancelOrd, err := o.api.GetBitmex().CancelOrders(&bitmex.OrderCancelParams{
-			OrderID: orders[0].OrderID,
-		})
+		position, err := o.getPosition(symbol)
 		if err != nil {
-			return err
+			o.log.Errorf("OrderProcessor.getPosition() failed: %v", err)
+			return
 		}
-		o.log.Debugf("canceled %s order: %#v", orders[0].OrderID, cancelOrd)
-	}
 
-	for _, order := range orders {
-		if order.OrdType == string(types.LimitIfTouched) {
-			o.log.Debugf("this order is trailing stop, amend not needed, oid:%v", order.OrderID)
-			continue
-		}
-		duration := time.Now().UTC().Sub(order.Timestamp)
-		o.log.Debugf("process order:%v duration: %v", order.OrderID, duration)
-		if duration > o.tickPeriod {
-			inst, err := o.getInstrument()
-			if err != nil {
-				return err
-			}
-			var price float64
-			switch types.Side(order.Side) {
-			case types.SideSell:
-				price = inst.AskPrice
-			case types.SideBuy:
-				price = inst.BidPrice
-			}
-			ord, err := o.api.GetBitmex().AmendOrder(&bitmex.OrderAmendParams{
-				OrderID: order.OrderID,
-				Price:   price,
-				Text:    "amend order - proc active orders",
-			})
-			if err != nil {
-				o.log.Errorf("failed amend order:id:%s, error: %v", order.OrderID, err)
-				continue
-			}
-			o.log.Debugf("amend order successfully completed: %#v", ord)
-		}
+		o.currentPosition.AvgCostPrice = position.AvgCostPrice
+		o.currentPosition.AvgEntryPrice = position.AvgEntryPrice
+		o.currentPosition.LastPrice = position.LastPrice
+		o.currentPosition.CurrentQty = position.CurrentQty
 	}
+}
 
-	return nil
+func (o *OrderProcessor) GetPosition() (*bitmex.Position, bool) {
+	o.mx.Lock()
+	defer o.mx.Unlock()
+	return o.currentPosition, o.currentPosition != nil
 }
 
 func (o *OrderProcessor) PlaceOrder(
@@ -178,9 +89,6 @@ func (o *OrderProcessor) PlaceOrder(
 	side types.Side,
 	amount float64,
 	passive bool,
-	withStop bool,
-	maxPrice,
-	minPrice float64,
 ) (order interface{}, err error) {
 	switch exchange {
 	case types.Bitmex:
@@ -207,27 +115,18 @@ func (o *OrderProcessor) PlaceOrder(
 			price = inst.BidPrice
 		}
 
-		var position *bitmex.Position
 		if amount == 0 {
-			position, err = o.getPosition()
-			if err != nil {
-				return nil, err
-			}
-			err = o.checkLiquidation(position, price, side)
+			err = o.checkLiquidation(price, side)
 			if err != nil {
 				return nil, err
 			}
 			amount, err = o.calcOrderQty(
-				position,
 				availableBalance,
 				side,
 			)
 			if err != nil {
 				return nil, err
 			}
-		}
-		if position == nil {
-			position = &o.currentPosition
 		}
 
 		params := &bitmex.OrderNewParams{
@@ -238,81 +137,18 @@ func (o *OrderProcessor) PlaceOrder(
 			Price:     price,
 		}
 		if passive {
-			params.ExecInst = PassiveOrderType
+			params.ExecInst = string(types.PassiveOrderExecInstType)
 		}
 		o.log.Infof("create order params: %#v", params)
-		order, err := o.api.GetBitmex().CreateOrder(params)
+		order, err = o.api.GetBitmex().CreateOrder(params)
 		if err != nil {
 			return nil, err
-		}
-
-		if withStop {
-			err = o.placeStopOrder(
-				order.OrderID,
-				params,
-				types.LimitIfTouched,
-				types.TrailingStopPeg,
-				maxPrice,
-				minPrice)
-			if err != nil {
-				return nil, err
-			}
 		}
 
 		return order, nil
 	default:
 		return nil, fmt.Errorf("unknown exchange: %s", exchange)
 	}
-}
-
-// placeStopOrder - place stop order
-// TODO: needed manual and unit or integration testing
-func (o *OrderProcessor) placeStopOrder(
-	clOrdID string,
-	params *bitmex.OrderNewParams,
-	ordType types.OrderType,
-	priceType types.PriceType,
-	maxPrice,
-	minPrice float64,
-) error {
-	var (
-		stopPrice float64
-		stopSide  types.Side
-		offset    float64
-	)
-	if types.Side(params.Side) == types.SideBuy {
-		stopSide = types.SideSell
-		stopPrice = minPrice
-		offset = -1 * trailingOffset
-	} else if types.Side(params.Side) == types.SideSell {
-		stopSide = types.SideBuy
-		stopPrice = maxPrice
-		offset = trailingOffset
-	} else {
-		return fmt.Errorf("unknown side: %v", params.Side)
-	}
-
-	stopParams := &bitmex.OrderNewParams{
-		ClientOrderID:  clOrdID,
-		Symbol:         params.Symbol,
-		StopPx:         stopPrice,
-		Price:          stopPrice,
-		OrderType:      string(ordType),
-		Side:           string(stopSide),
-		PegPriceType:   string(priceType),
-		PegOffsetValue: offset,
-		OrderQty:       params.OrderQty,
-		ExecInst:       string(types.LastPrice),
-	}
-
-	o.log.Infof("create trailing stop order params: %#v", stopParams)
-	order, err := o.api.GetBitmex().CreateOrder(stopParams)
-	if err != nil {
-		return err
-	}
-	o.log.Debugf("trailing stop order placed: %#v", order)
-
-	return nil
 }
 
 func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, err error) {
@@ -350,16 +186,37 @@ func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
 	return insts[0], nil
 }
 
+func (o *OrderProcessor) getPosition(symbol string) (bitmex.Position, error) {
+	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
+		Columns: "avgCostPrice,avgEntryPrice,currentQty,lastPrice",
+	})
+	if err != nil {
+		return bitmex.Position{}, err
+	}
+
+	for _, pos := range positions {
+		if pos.Symbol == symbol {
+			return pos, nil
+		}
+	}
+
+	return bitmex.Position{}, nil
+}
+
 func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
+	currentPosition, ok := o.GetPosition()
+	if !ok {
+		return nil
+	}
 	switch side {
 	case types.SideSell:
-		isLimitedShort := o.currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedShort := currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedShort {
 			return fmt.Errorf("place sell order limitted - qty: %d, limit: %d",
 				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		}
 	case types.SideBuy:
-		isLimitedLong := o.currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedLong := currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedLong {
 			return fmt.Errorf("place buy order limitted - qty: %d, limit: %d",
 				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
@@ -370,29 +227,14 @@ func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
 	return nil
 }
 
-func (o *OrderProcessor) getPosition() (*bitmex.Position, error) {
-	positions, err := o.api.GetBitmex().GetPositions(bitmex.PositionGetParams{
-		Filter: fmt.Sprintf(`{"symbol": "%s"}`, o.cfg.ExchangesSettings.Bitmex.Symbol),
-	})
-	if err != nil {
-		return nil, err
-	}
-	for _, position := range positions {
-		if position.Symbol == o.cfg.ExchangesSettings.Bitmex.Symbol {
-			o.currentPosition = position
-			return &position, nil
-		}
-	}
-
-	return nil, errors.New("position not exist")
-}
-
 // calcOrderQty in contracts
-func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64, side types.Side) (qtyContrts float64, err error) {
-	positionPnlToBTC := trademath.ConvertToBTC(position.UnrealisedPnl)
-	if positionPnlToBTC > 0 {
-		qtyContrts = math.Abs(float64(position.OpeningQty))
-		return
+func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyContrts float64, err error) {
+	position, ok := o.GetPosition()
+	if ok {
+		if position.CurrentQty > 0 {
+			qtyContrts = math.Abs(float64(position.CurrentQty))
+			return
+		}
 	}
 
 	var qtyBtc float64
@@ -417,15 +259,19 @@ func (o *OrderProcessor) calcOrderQty(position *bitmex.Position, balance float64
 }
 
 //
-func (o *OrderProcessor) checkLiquidation(position *bitmex.Position, price float64, side types.Side) error {
+func (o *OrderProcessor) checkLiquidation(price float64, side types.Side) error {
+	position, ok := o.GetPosition()
+	if !ok {
+		return nil
+	}
 	liquidationDiff := math.Abs(position.LiquidationPrice - price)
 	isLiquidationWarn := liquidationDiff < liquidationPriceLimit
-	if position.OpeningQty < 0 &&
+	if position.CurrentQty < 0 &&
 		side == types.SideSell &&
 		isLiquidationWarn {
 		return errors.New("liquidation warning triggered; further placing of sell orders suspended")
 	}
-	if position.OpeningQty > 0 &&
+	if position.CurrentQty > 0 &&
 		side == types.SideBuy &&
 		isLiquidationWarn {
 		return errors.New("liquidation warning triggered; further placing of buy orders suspended")

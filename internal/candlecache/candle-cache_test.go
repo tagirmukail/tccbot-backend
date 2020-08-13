@@ -103,6 +103,7 @@ func TestCandleCache_StoreBatch(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.StoreBatch(tt.args.batch)
@@ -165,8 +166,10 @@ func TestCandleCache_Store(t *testing.T) {
 			},
 			args: args{
 				candle: data.BitmexIncomingData{
-					Symbol:    types.XBTUSD,
-					Close:     456,
+					Symbol: types.XBTUSD,
+					TradeBinData: data.TradeBinData{
+						Close: 456,
+					},
 					Timestamp: "2020-05-16T10:45:00.000Z",
 				},
 			},
@@ -214,8 +217,10 @@ func TestCandleCache_Store(t *testing.T) {
 			},
 			args: args{
 				candle: data.BitmexIncomingData{
-					Symbol:    types.Symbol("BTC"),
-					Close:     456,
+					Symbol: types.Symbol("BTC"),
+					TradeBinData: data.TradeBinData{
+						Close: 456,
+					},
 					Timestamp: "2020-05-16T10:45:00.000Z",
 				},
 			},
@@ -224,6 +229,7 @@ func TestCandleCache_Store(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.store = tt.fields.store
@@ -566,6 +572,7 @@ func TestCandleCache_GetBucketed(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewCandleCache(tt.fields.maxCount, tt.fields.symbol, tt.fields.log)
 			c.store = tt.fields.store

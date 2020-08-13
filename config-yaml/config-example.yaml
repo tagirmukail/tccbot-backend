@@ -26,14 +26,6 @@ admin:
   username: admin
   secret_token: token
 
-db:
-  host: localhost
-  port: 5432
-  name: tccbot_db
-  user: postgres
-  password: 123456
-  sslmode: disable
-
 exchanges_access:
   bitmex:
     key: key
@@ -101,6 +93,15 @@ strategies_g:
     macd_fast_count: 12
     macd_slow_count: 26
     macd_sig_count: 9
+
+scheduler:
+  position:
+    enable: true
+    trailing_price: 5
+    profit_close_btc: 0.00001
+    loss_close_btc: 0.00008
+    profit_pnl_diff: 0.00005
+    loss_pnl_diff: 0.00002
 
 ord_proc_period_sec: 180
 db_path: sqlite3://tccbot_db?x-migrations-table=schema_migrations

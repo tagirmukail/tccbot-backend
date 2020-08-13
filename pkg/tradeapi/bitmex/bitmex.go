@@ -66,7 +66,7 @@ func New(
 	return &Bitmex{
 		key:              key,
 		secret:           secret,
-		url:              bitmexUrl,
+		url:              bitmexURL,
 		verbose:          verbose,
 		retryCount:       retryCount,
 		maxRequestsLimit: maxRequestsLimit,
@@ -80,7 +80,7 @@ func New(
 }
 
 func (b *Bitmex) EnableTestNet() {
-	b.url = testnetUrl
+	b.url = testnetURL
 }
 
 func (b *Bitmex) GetWS() *ws.WS {
@@ -155,14 +155,22 @@ func (b *Bitmex) SendAuthenticatedRequest(
 	headers["api-key"] = b.key
 
 	var data string
+	var uri = b.url + path
 	if params != nil {
-		bData, err := json.Marshal(params)
-		if err != nil {
-			return err
-		}
-		data = string(bData)
-		if b.verbose {
-			b.logger.Infof("request params: %s", data)
+		if urlValues, ok := params.(url.Values); !ok {
+			bData, err := json.Marshal(params)
+			if err != nil {
+				return err
+			}
+			data = string(bData)
+			if b.verbose {
+				b.logger.Infof("request params: %s", data)
+			}
+		} else {
+			encodeParams := urlValues.Encode()
+			path += "?" + encodeParams
+			uri += "?" + encodeParams
+
 		}
 	}
 	hmac := crypto.GetHashMessage(crypto.HashSHA256,
@@ -172,7 +180,7 @@ func (b *Bitmex) SendAuthenticatedRequest(
 
 	if err := b.do(&Request{
 		Method:      verb,
-		Path:        b.url + path,
+		Path:        uri,
 		Headers:     headers,
 		Body:        bytes.NewBuffer([]byte(data)),
 		Response:    &response,
@@ -185,9 +193,9 @@ func (b *Bitmex) SendAuthenticatedRequest(
 	return nil
 }
 
-func (b *Bitmex) do(item *Request) error {
+func (b *Bitmex) do(item *Request) error { // nolint:funlen
 	b.rwLock.RLock()
-	b.rwLock.RUnlock()
+	defer b.rwLock.RUnlock()
 
 	cli := b.getClient()
 	if err := b.validateRequestItem(item); err != nil {
@@ -219,7 +227,7 @@ func (b *Bitmex) do(item *Request) error {
 	var resp *http.Response
 	for i := 0; i < b.retryCount; i++ {
 		atomic.AddInt32(&b.requestsCount, 1)
-		resp, err = cli.Do(req)
+		resp, err = cli.Do(req) // nolint:bodyclose
 		atomic.AddInt32(&b.requestsCount, -1)
 		if err != nil {
 			if b.verbose {

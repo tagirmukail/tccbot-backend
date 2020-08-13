@@ -3,8 +3,8 @@ package models
 import "time"
 
 type Candle struct {
-	ID              int64     `db:"id",json:"id"`
-	Theme           string    `db:"theme",json:"theme"`
+	ID              int64     `db:"id" json:"id"`
+	Theme           string    `db:"theme" json:"theme"`
 	Symbol          string    `db:"symbol"`
 	Timestamp       time.Time `db:"timestamp"`
 	Open            float64   `db:"open"`

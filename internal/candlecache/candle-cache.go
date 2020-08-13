@@ -107,11 +107,7 @@ func (c *CandleCache) Store(candle data.BitmexIncomingData) error {
 	return nil
 }
 
-func (c *CandleCache) GetBucketed(
-	from,
-	to time.Time,
-	count int,
-) []bitmex.TradeBuck {
+func (c *CandleCache) GetBucketed(from, to time.Time, count int) []bitmex.TradeBuck { // nolint:gocognit
 	var result []bitmex.TradeBuck
 	if count > c.maxCount {
 		count = c.maxCount
@@ -125,7 +121,7 @@ func (c *CandleCache) GetBucketed(
 
 	c.sort()
 	for _, candle := range c.store {
-		candleTs, err := time.Parse(
+		candleTS, err := time.Parse(
 			tradeapi.TradeBucketedTimestampLayout,
 			candle.Timestamp,
 		)
@@ -134,15 +130,15 @@ func (c *CandleCache) GetBucketed(
 			return nil
 		}
 		if fromToNotZero {
-			if (candleTs.After(from) && candleTs.Before(to)) || candleTs.Equal(from) || candleTs.Equal(to) {
+			if (candleTS.After(from) && candleTS.Before(to)) || candleTS.Equal(from) || candleTS.Equal(to) {
 				result = append(result, candle)
 			}
 			continue
 		} else {
-			if (!fromZero && candleTs.After(from)) || (!fromZero && candleTs.Equal(from)) {
+			if (!fromZero && candleTS.After(from)) || (!fromZero && candleTS.Equal(from)) {
 				result = append(result, candle)
 				continue
-			} else if (!toZero && candleTs.Before(to)) || (!toZero && candleTs.Equal(to)) {
+			} else if (!toZero && candleTS.Before(to)) || (!toZero && candleTS.Equal(to)) {
 				result = append(result, candle)
 				continue
 			}
@@ -182,5 +178,4 @@ func (c *CandleCache) sort() {
 
 		return timestamp1.Before(timestamp2)
 	})
-	return
 }

@@ -4,10 +4,13 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/crypto"
 
 	"github.com/gorilla/websocket"
 	jsoniter "github.com/json-iterator/go"
@@ -20,10 +23,10 @@ import (
 
 const (
 	timeReadSleep    = 3 * time.Second
-	handshakeTimeout = 5 * time.Second
+	handshakeTimeout = 3 * time.Second
 
-	bitmexWSUrl        = "wss://www.bitmex.com/realtime"
-	bitmexTestnetWSUrl = "wss://testnet.bitmex.com/realtime"
+	bitmexWSURL        = "wss://www.bitmex.com/realtime"
+	bitmexTestnetWSURL = "wss://testnet.bitmex.com/realtime"
 )
 
 type Receiver interface {
@@ -33,7 +36,7 @@ type WS struct {
 	log *logrus.Logger
 
 	ws      *recws.RecConn
-	connUrl string
+	connURL string
 
 	pingInterval int // ping interval in second
 	timeout      int // in second
@@ -41,6 +44,9 @@ type WS struct {
 	theme    []types.Theme
 	symbol   types.Symbol
 	messages chan *data.BitmexData
+
+	apiKey    string
+	apiSecret string
 }
 
 func NewWS(
@@ -51,12 +57,14 @@ func NewWS(
 	retrySec uint32,
 	theme []types.Theme,
 	symbol types.Symbol,
+	apiKey string,
+	apiSecret string,
 ) *WS {
-	var bitmexUrl string
+	var bitmexURL string
 	if test {
-		bitmexUrl = bitmexTestnetWSUrl
+		bitmexURL = bitmexTestnetWSURL
 	} else {
-		bitmexUrl = bitmexWSUrl
+		bitmexURL = bitmexWSURL
 	}
 
 	wsr := &WS{
@@ -68,15 +76,18 @@ func NewWS(
 			NonVerbose:       true,
 			HandshakeTimeout: handshakeTimeout,
 		},
-		connUrl:      bitmexUrl + "?" + buildSubscribeParams(symbol, theme),
+		connURL:      bitmexURL,
 		pingInterval: ping,
 		timeout:      timeout,
 		theme:        theme,
 		symbol:       symbol,
 		messages:     make(chan *data.BitmexData),
+		apiKey:       apiKey,
+		apiSecret:    apiSecret,
 	}
 
-	wsr.ws.SubscribeHandler = wsr.subscribeHandler
+	wsr.connURL = bitmexURL
+	wsr.ws.SubscribeHandler = wsr.subscribeAuthHandler
 
 	return wsr
 }
@@ -91,14 +102,14 @@ func (r *WS) Start(wgForeign *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
-	r.ws.Dial(r.connUrl, nil)
+	r.ws.Dial(r.connURL, nil)
 	err := r.ws.GetDialError()
 	if err != nil {
 		r.log.Fatalf("bitmex not connected, error: %v", err)
 	}
 	defer r.ws.Close()
 
-	r.log.Infof("connected to %s", r.connUrl)
+	r.log.Infof("connected to %s", r.connURL)
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -131,9 +142,8 @@ func (r *WS) read(wg *sync.WaitGroup) {
 
 		switch mType {
 		case websocket.CloseMessage:
-			r.log.Infof("WS.read() %s websocket bitmex closed", r.connUrl)
-			close(r.messages)
-			return
+			r.log.Infof("WS.read() %s websocket bitmex closed: %v", r.connURL, string(msg))
+			continue
 		case websocket.TextMessage:
 			break
 		default:
@@ -167,35 +177,62 @@ func (r *WS) read(wg *sync.WaitGroup) {
 			return
 		case r.messages <- resp:
 			//r.log.Debugf("bitmex sends message data: %s", string(data))
-		default:
-			continue
 		}
 	}
 
 }
 
-// subscribeHandler fires after the connection successfully establish and subscribed on ws messages by theme
-func (r *WS) subscribeHandler() error {
+func (r *WS) subscribeAuthHandler() error {
 	j := jsoniter.ConfigCompatibleWithStandardLibrary
 
-	var themes []types.Theme
-	for _, theme := range r.theme {
-		themes = append(themes, types.NewTemeWithPair(theme, r.symbol))
+	timestamp := time.Now().Add(time.Hour * 1).Unix()
+	timestampNew := strconv.FormatInt(timestamp, 10)
+
+	hmac := crypto.GetHashMessage(crypto.HashSHA256,
+		[]byte("GET/realtime"+timestampNew),
+		[]byte(r.apiSecret))
+
+	authMsg := types.NewAuthMsg(r.apiKey, crypto.HexEncodeToString(hmac), timestamp)
+	bData, err := j.Marshal(authMsg)
+	if err != nil {
+		r.log.Errorf("WS.subscribeAuthHandler() marshal error: %v", err)
+		return err
 	}
+	err = r.ws.WriteMessage(websocket.TextMessage, bData)
+	if err != nil {
+		r.log.Errorf("WS.subscribeAuthHandler() websocket write [msg]:%#v error: %v", authMsg, err)
+		return err
+	}
+
+	return r.subscribe()
+}
+
+// subscribeHandler fires after the connection successfully establish and subscribed on ws messages by theme
+func (r *WS) subscribe() error {
+	j := jsoniter.ConfigCompatibleWithStandardLibrary
+
+	var themes = make([]types.Theme, 0)
+	for _, theme := range r.theme {
+		if strings.Contains(string(theme), string(types.Trade)) {
+			theme = types.NewTemeWithPair(theme, r.symbol)
+		}
+		themes = append(themes, theme)
+	}
+
 	subsMsg := types.NewSubscribeMsg(
 		types.SubscribeAct,
 		themes,
 	)
 	data, err := j.Marshal(subsMsg)
 	if err != nil {
-		r.log.Errorf("WS.Start() marshal error: %v", err)
+		r.log.Errorf("WS.subscribe() marshal error: %v", err)
 		return err
 	}
 
 	err = r.ws.WriteMessage(websocket.TextMessage, data)
 	if err != nil {
-		r.log.Errorf("WS.Start() websocket write msg error: %v", err)
-		r.log.Errorf("WS.Start() websocket write msg data: %#v", subsMsg)
+		r.log.Errorf("WS.subscribe() websocket write msg error: %v", err)
+		r.log.Errorf("WS.subscribe() websocket write msg data: %#v", subsMsg)
 		return err
 	}
 
@@ -236,7 +273,7 @@ func (r *WS) ping(wg *sync.WaitGroup) {
 
 func buildSubscribeParams(symbol types.Symbol, themes []types.Theme) string {
 	params := url.Values{}
-	var subsParams []string
+	var subsParams = make([]string, 0)
 	for _, th := range themes {
 		subsParams = append(subsParams, string(types.NewTemeWithPair(th, symbol)))
 	}

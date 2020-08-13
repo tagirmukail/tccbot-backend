@@ -35,7 +35,7 @@ func (s *Strategies) binProcess(binSize string) error {
 		return err
 	}
 
-	candles, err := s.tradeApi.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
+	candles, err := s.tradeAPI.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
 		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     int32(count),
@@ -72,7 +72,7 @@ func (s *Strategies) binProcess(binSize string) error {
 		}
 
 		// MACD
-		err = s.macdSave(timestamp, binType, closes[:i], i)
+		err = s.macdSave(timestamp, binType, closes[:i])
 		if err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func (s *Strategies) binProcess(binSize string) error {
 }
 
 func (s *Strategies) macdSave(
-	timestamp time.Time, size models.BinSize, closes []float64, step int) error {
+	timestamp time.Time, size models.BinSize, closes []float64) error {
 
 	macd := s.tradeCalc.CalcMACD(
 		closes,
@@ -126,20 +126,21 @@ func (s *Strategies) macdSave(
 
 func (s *Strategies) rsiSave(
 	timestamp time.Time, size models.BinSize, closes []float64, step int) error {
-	signals, err := s.db.GetSignalsByTs(models.RSI, size, []time.Time{timestamp})
+	signals, err := s.db.GetSignalsByTS(models.RSI, size, []time.Time{timestamp})
 	if err != nil {
 		return err
 	}
 	if len(signals) != 0 {
-		if signals[0].SignalValue >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder) {
+		switch {
+		case signals[0].SignalValue >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder):
 			s.rsiPrev.maxBorderInProc = true
 			s.rsiPrev.minBorderInProc = false
 			s.log.Infof("max border is overcome up")
-		} else if signals[0].SignalValue <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder) {
+		case signals[0].SignalValue <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder):
 			s.rsiPrev.minBorderInProc = true
 			s.rsiPrev.maxBorderInProc = false
 			s.log.Infof("min border is overcome - down")
-		} else {
+		default:
 			s.rsiPrev.maxBorderInProc = false
 			s.rsiPrev.minBorderInProc = false
 		}
@@ -157,15 +158,16 @@ func (s *Strategies) rsiSave(
 		SignalValue: rsi.Value,
 	})
 
-	if rsi.Value >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder) {
+	switch {
+	case rsi.Value >= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMaxBorder):
 		s.rsiPrev.maxBorderInProc = true
 		s.rsiPrev.minBorderInProc = false
 		s.log.Infof("max border is overcome up")
-	} else if rsi.Value <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder) {
+	case rsi.Value <= float64(s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).RsiMinBorder):
 		s.rsiPrev.minBorderInProc = true
 		s.rsiPrev.maxBorderInProc = false
 		s.log.Infof("min border is overcome - down")
-	} else {
+	default:
 		s.rsiPrev.maxBorderInProc = false
 		s.rsiPrev.minBorderInProc = false
 	}
@@ -176,7 +178,7 @@ func (s *Strategies) otherSignals(timestamp time.Time, size models.BinSize, clos
 	if step < s.cfg.GlobStrategies.GetCfgByBinSize(size.String()).GetCandlesCount {
 		return nil
 	}
-	sigs, err := s.db.GetSignalsByTs(models.BolingerBand, size, []time.Time{timestamp})
+	sigs, err := s.db.GetSignalsByTS(models.BolingerBand, size, []time.Time{timestamp})
 	if err != nil {
 		return err
 	}

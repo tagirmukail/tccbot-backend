@@ -112,7 +112,7 @@ func (db *DB) saveSignal(data models.Signal) (int64, error) {
 //	return nil, nil
 //}
 
-func (db *DB) GetSignalsByTs(
+func (db *DB) GetSignalsByTS(
 	signalType models.SignalType, binSize models.BinSize, ts []time.Time,
 ) ([]*models.Signal, error) {
 	var result = make([]*models.Signal, 0, len(ts)*2)
@@ -121,7 +121,7 @@ func (db *DB) GetSignalsByTs(
 		return result, nil
 	}
 
-	var tsArgs []string
+	var tsArgs = make([]string, 0, len(ts))
 	for _, t := range ts {
 		tsArgs = append(tsArgs, t.Format("2006-01-02 15:04:05+00:00"))
 	}
@@ -139,7 +139,7 @@ func (db *DB) GetSignalsByTs(
 		return nil, err
 	}
 	for i, sig := range result {
-		db.log.Debugf("GetSignalsByTs SQL RESULT[%d]:[%#v]", i, sig)
+		db.log.Debugf("GetSignalsByTS SQL RESULT[%d]:[%#v]", i, sig)
 	}
 	return result, nil
 }

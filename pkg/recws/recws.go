@@ -409,7 +409,7 @@ func (rc *RecConn) keepAlive() {
 		defer ticker.Stop()
 
 		for {
-			select {
+			select { // nolint:gosimple
 			case <-tickerCheckConnected.C:
 				if !rc.IsConnected() {
 					continue
@@ -434,7 +434,7 @@ func (rc *RecConn) connect() {
 
 	for {
 		nextItvl := b.Duration()
-		wsConn, httpResp, err := rc.dialer.Dial(rc.url, rc.reqHeader)
+		wsConn, httpResp, err := rc.dialer.Dial(rc.url, rc.reqHeader) // nolint:bodyclose
 
 		rc.mu.Lock()
 		rc.Conn = wsConn
@@ -443,7 +443,7 @@ func (rc *RecConn) connect() {
 		rc.httpResp = httpResp
 		rc.mu.Unlock()
 
-		if err == nil {
+		if err == nil { // nolint:nestif
 			if !rc.getNonVerbose() {
 				log.Printf("Dial: connection was successfully established with %s\n", rc.url)
 			}

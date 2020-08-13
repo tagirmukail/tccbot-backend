@@ -2,8 +2,8 @@ package crypto
 
 import (
 	"crypto/hmac"
-	"crypto/md5"
-	"crypto/sha1"
+	"crypto/md5"  // nolint:gosec
+	"crypto/sha1" // nolint:gosec
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
@@ -37,7 +37,7 @@ func GetHashMessage(hashType int, input, key []byte) []byte {
 	}
 
 	h := hmac.New(hasher, key)
-	h.Write(input)
+	h.Write(input) // nolint:errcheck
 	return h.Sum(nil)
 }
 

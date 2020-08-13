@@ -14,8 +14,9 @@ import (
 
 const (
 	// set environments by this keys for examples on your account
-	keyEnv       = "BITMEX_KEY"
-	secretKeyEnv = "BITMEX_SECRET_KEY"
+	keyEnv                 = "BITMEX_KEY"
+	secretKeyEnv           = "BITMEX_SECRET_KEY"
+	defaultIdleConnTimeout = 15 * time.Second
 )
 
 func getEnvs(t *testing.T) map[string]string {

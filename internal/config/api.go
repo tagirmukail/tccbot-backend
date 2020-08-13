@@ -8,15 +8,15 @@ import (
 )
 
 type ExchangesSettings struct {
-	Bitmex ApiSettings
+	Bitmex APISettings
 }
 
 type ExchangeSettings struct {
 	Enable bool
-	Api    ApiSettings
+	API    APISettings
 }
 
-type ApiSettings struct {
+type APISettings struct {
 	Test                bool
 	PingSec             int
 	TimeoutSec          int
@@ -46,11 +46,11 @@ type Access struct {
 }
 
 func initExchangesApi() ExchangesSettings {
-	var bitmex ApiSettings
+	var bitmex APISettings
 	bitmexSettings := viper.GetStringMap("exchanges_settings.bitmex")
 	if len(bitmexSettings) == 0 {
 		// default
-		bitmex = ApiSettings{
+		bitmex = APISettings{
 			Test:                true,
 			PingSec:             20,
 			TimeoutSec:          30,
@@ -66,7 +66,7 @@ func initExchangesApi() ExchangesSettings {
 			SellOrderCoef:       0.1,
 		}
 	} else {
-		bitmex = ApiSettings{
+		bitmex = APISettings{
 			Test:                viper.GetBool("exchanges_settings.bitmex.test"),
 			PingSec:             viper.GetInt("exchanges_settings.bitmex.ping_sec"),
 			TimeoutSec:          viper.GetInt("exchanges_settings.bitmex.timeout_sec"),

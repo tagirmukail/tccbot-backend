@@ -21,24 +21,22 @@ import (
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
 )
 
-// TODO: при выставлении ордера ставить защитный стоп ордер(good till canceled)
-
 type BBRSIStrategy struct {
 	cfg       *config.GlobalConfig
-	api       tradeapi.Api
+	api       tradeapi.API
 	math      trademath.Calc
 	orderProc *orderproc.OrderProcessor
 	log       *logrus.Logger
-	db        db.DBManager
+	db        db.DatabaseManager
 	caches    candlecache.Caches
 	filters   []filter.Filter
 }
 
 func NewBBRSIStrategy(
 	cfg *config.GlobalConfig,
-	api tradeapi.Api,
+	api tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
-	db db.DBManager,
+	db db.DatabaseManager,
 	caches candlecache.Caches,
 	log *logrus.Logger,
 	filters ...filter.Filter,
@@ -88,7 +86,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 
 	var (
 		lastCandles   []bitmex.TradeBuck
-		lastCandlesTs []time.Time
+		lastCandlesTS []time.Time
 		lastSignals   []*models.Signal
 		action        stratypes.Action
 	)
@@ -100,12 +98,12 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 			return err
 		}
 
-		lastCandlesTs, err = fetchTsFromCandles(lastCandles)
+		lastCandlesTS, err = fetchTSFromCandles(lastCandles)
 		if err != nil {
 			return err
 		}
 
-		lastSignals, err = s.db.GetSignalsByTs(models.BolingerBand, size, lastCandlesTs)
+		lastSignals, err = s.db.GetSignalsByTS(models.BolingerBand, size, lastCandlesTS)
 		if err != nil {
 			return err
 		}
@@ -113,17 +111,12 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action = s.processTrend(size, lastCandles, lastSignals)
 	}
 
-	max, min := findMaxAndMin(candles)
-
 	applySide := s.ApplyFilters(action, candles, size)
-	switch applySide {
-	case types.SideSell:
-		return placeBitmexOrder(s.orderProc, types.SideSell, true, s.log, max, min)
-	case types.SideBuy:
-		return placeBitmexOrder(s.orderProc, types.SideBuy, true, s.log, max, min)
-	default:
+	if applySide != types.SideBuy && applySide != types.SideSell {
 		return nil
 	}
+
+	return placeBitmexOrder(s.orderProc, applySide, true, s.log)
 }
 
 func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {
@@ -207,7 +200,7 @@ func (s *BBRSIStrategy) processBB(
 		s.log.Debug("processBBStrategyCandles closes is empty")
 		return bb, errors.New("all candles invalid")
 	}
-	lastCandleTs, err := time.Parse(
+	lastCandleTS, err := time.Parse(
 		tradeapi.TradeBucketedTimestampLayout,
 		candles[len(candles)-1].Timestamp,
 	)
@@ -219,7 +212,7 @@ func (s *BBRSIStrategy) processBB(
 	_, err = s.db.SaveSignal(models.Signal{
 		N:          cfg.GetCandlesCount,
 		BinSize:    size,
-		Timestamp:  lastCandleTs,
+		Timestamp:  lastCandleTS,
 		SignalType: models.BolingerBand,
 		BBTL:       tl,
 		BBML:       ml,

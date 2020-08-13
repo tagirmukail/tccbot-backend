@@ -91,7 +91,7 @@ func (b *Bitmex) CancelAllOrders(params *OrderCancelAllParams) ([]OrderCopied, e
 
 func (b *Bitmex) GetTradeBucketed(params *TradeGetBucketedParams) ([]TradeBuck, error) {
 	var resp []TradeBuck
-	vals, err := params.toUrlVals()
+	vals, err := params.toURLVals()
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (b *Bitmex) GetPositions(params PositionGetParams) ([]Position, error) {
 	return positions, b.SendAuthenticatedRequest(
 		http.MethodGet,
 		endpointPosition,
-		params,
+		params.toURLVals(),
 		&positions,
 	)
 }
@@ -128,7 +128,7 @@ func (b *Bitmex) GetInstrument(params InstrumentRequestParams) ([]Instrument, er
 	var resp []Instrument
 	return resp, b.SendRequest(
 		endpointInstrument,
-		params.toUrlVars(),
+		params.toURLVals(),
 		&resp,
 	)
 }

@@ -60,7 +60,8 @@ func (f *TrendFilter) checkPrevActions(size models.BinSize) types.Side {
 		return types.SideEmpty
 	}
 	if len(f.prevActions) < cfg.MaxFilterTrendCount {
-		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - prev action count less than max_filter_trend_count, exit")
+		f.log.Debug("TrendFilter.Apply - checkAction - checkPrevActions - " +
+			"prev action count less than max_filter_trend_count, exit")
 		return types.SideEmpty
 	}
 	firstAction := f.prevActions[0]

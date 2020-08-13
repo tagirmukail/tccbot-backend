@@ -18,7 +18,7 @@ func TestCalc_CalculateSignals(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want Singals
+		want Signals
 	}{
 		{
 			name: "ok",
@@ -46,7 +46,7 @@ func TestCalc_CalculateSignals(t *testing.T) {
 					1122,
 				},
 			},
-			want: Singals{
+			want: Signals{
 				SMA: 1112,
 				WMA: 1112.5714,
 				EMA: 1112,
@@ -59,6 +59,7 @@ func TestCalc_CalculateSignals(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
 			got := c.CalcSignals(tt.args.values, talib.SMA)
@@ -74,7 +75,7 @@ func BenchmarkCalc_CalculateSignals(b *testing.B) {
 	tests := []struct {
 		name string
 		args args
-		want Singals
+		want Signals
 	}{
 		{
 			name: "10 values",
@@ -92,7 +93,7 @@ func BenchmarkCalc_CalculateSignals(b *testing.B) {
 					1122,
 				},
 			},
-			want: Singals{
+			want: Signals{
 				SMA: 1112,
 				WMA: 1113.0909,
 				EMA: 1113.3636,
@@ -108,7 +109,7 @@ func BenchmarkCalc_CalculateSignals(b *testing.B) {
 			args: args{
 				values: generateValues(1000, 1300, 1000),
 			},
-			want: Singals{
+			want: Signals{
 				SMA: 1112,
 				WMA: 1113.0909,
 				EMA: 1113.3636,
@@ -121,6 +122,7 @@ func BenchmarkCalc_CalculateSignals(b *testing.B) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		b.Run(tt.name, func(b *testing.B) {
 			c := &Calc{}
 			c.CalcSignals(tt.args.values, talib.SMA)
@@ -190,6 +192,7 @@ func TestCalc_CalculateRSI(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
 			got := c.CalcRSI(tt.args.values, 14)
@@ -260,10 +263,70 @@ func TestCalc_CalculateMACD(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Calc{}
 			got := c.CalcMACD(tt.args.values, 14, talib.EMA, 26, talib.EMA, 9, talib.WMA)
 			assertr.Equal(tt.want, got, "MACD calculation")
+		})
+	}
+}
+
+func TestCalculateUnrealizedPNL(t *testing.T) {
+	type args struct {
+		openPrice      float64
+		lastPrice      float64
+		contractcCount int64
+	}
+	tests := []struct {
+		name string
+		args args
+		want float64
+	}{
+		{
+			name: "long - profit",
+			args: args{
+				openPrice:      8000,
+				lastPrice:      9000,
+				contractcCount: 100,
+			},
+			want: 0.0013889,
+		},
+		{
+			name: "long - loss",
+			args: args{
+				openPrice:      9000,
+				lastPrice:      8000,
+				contractcCount: 100,
+			},
+			want: -0.0013889,
+		},
+		{
+			name: "short - profit",
+			args: args{
+				openPrice:      9000,
+				lastPrice:      8000,
+				contractcCount: -100,
+			},
+			want: 0.0013889,
+		},
+		{
+			name: "short - loss",
+			args: args{
+				openPrice:      8000,
+				lastPrice:      9000,
+				contractcCount: -100,
+			},
+			want: -0.0013889,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CalculateUnrealizedPNL(
+				tt.args.openPrice, tt.args.lastPrice, tt.args.contractcCount); got != tt.want {
+				t.Errorf("CalculateUnrealizedPNL() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

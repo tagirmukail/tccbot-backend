@@ -7,7 +7,9 @@ import (
 	"github.com/tagirmukail/tccbot-backend/internal/trademath"
 )
 
-func (s *Strategies) saveSignals(timestamp time.Time, bin models.BinSize, n int, signals *trademath.Singals) error {
+func (s *Strategies) saveSignals( // nolint:unused
+	timestamp time.Time, bin models.BinSize, n int, signals *trademath.Signals,
+) error {
 	_, err := s.db.SaveSignal(models.Signal{
 		N:          n,
 		BinSize:    bin,

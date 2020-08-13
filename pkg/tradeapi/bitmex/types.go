@@ -169,7 +169,7 @@ type TradeBuck struct {
 }
 
 // Position Summary of Open and Closed Positions
-type Position struct {
+type Position struct { // nolint:maligned
 	Account              int64     `json:"account"`
 	AvgCostPrice         float64   `json:"avgCostPrice"`
 	AvgEntryPrice        float64   `json:"avgEntryPrice"`
@@ -264,7 +264,7 @@ type Position struct {
 }
 
 // Instrument Tradeable Contracts, Indices, and History
-type Instrument struct {
+type Instrument struct { // nolint:maligned
 	AskPrice                       float64   `json:"askPrice"`
 	BankruptLimitDownPrice         float64   `json:"bankruptLimitDownPrice"`
 	BankruptLimitUpPrice           float64   `json:"bankruptLimitUpPrice"`
