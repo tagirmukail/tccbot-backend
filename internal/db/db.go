@@ -72,20 +72,20 @@ type DB struct {
 }
 
 func NewDB(
-	cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command migrateDb.Command, step int,
+	cfg *config.UpdConfigurator, db *sqlx.DB, log *logrus.Logger, command migrateDb.Command, step int,
 ) (*DB, error) {
 	var err error
 	manager := &DB{
 		log:   log,
 		retry: defaultRetryCount,
 	}
-	if cfg.DBPath == "" {
-		cfg.DBPath = "sqlite3://tccbot_db?x-migrations-table=schema_migrations"
+	if cfg.GetConfig().DBPath == "" {
+		cfg.GetConfig().DBPath = "sqlite3://tccbot_db?x-migrations-table=schema_migrations"
 	}
 
 	var dbfile string
 	if db == nil {
-		purl, err := nurl.Parse(cfg.DBPath)
+		purl, err := nurl.Parse(cfg.GetConfig().DBPath)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +102,7 @@ func NewDB(
 		return nil, err
 	}
 
-	err = migrateDb.Migrate(cfg.DBPath, command, step)
+	err = migrateDb.Migrate(cfg.GetConfig().DBPath, command, step)
 	if err != nil && err != migrate.ErrNoChange {
 		return nil, err
 	}

@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
+
+	"github.com/tagirmukail/tccbot-backend/internal/config"
 
 	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
 
@@ -24,7 +27,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 	"github.com/tagirmukail/tccbot-backend/internal/strategies"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
@@ -115,13 +117,14 @@ func main() { // nolint:funlen
 	log.Infof("\nversion: %v;\ndate_build: %v;\ngit_hash: %v",
 		Version, DateBuild, GitHash)
 
-	cfg, err := config.ParseConfig(configPath)
+	updConfig, err := config.NewUpdConfigurator(configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	updConfig.UpdateRun(5*time.Second, configPath)
 
 	var dbManager db.DatabaseManager
-	dbManager, err = db.NewDB(cfg, nil, log, migrate_db.Command(migrationCommand), step)
+	dbManager, err = db.NewDB(updConfig, nil, log, migrate_db.Command(migrationCommand), step)
 	if err != nil {
 		log.Fatalf("migartion failed: %v", err)
 	}
@@ -130,12 +133,12 @@ func main() { // nolint:funlen
 		return
 	}
 
-	var tradeThemes = cfg.GlobStrategies.GetThemes()
+	var tradeThemes = updConfig.GetConfig().GlobStrategies.GetThemes()
 
-	bitmexKey, bitmexSecret := cfg.Accesses.Bitmex.Key, cfg.Accesses.Bitmex.Secret
+	bitmexKey, bitmexSecret := updConfig.GetConfig().Accesses.Bitmex.Key, updConfig.GetConfig().Accesses.Bitmex.Secret
 	if testMode {
-		bitmexKey, bitmexSecret = cfg.Accesses.Bitmex.Testnet.Key, cfg.Accesses.Bitmex.Testnet.Secret
-
+		bitmexKey = updConfig.GetConfig().Accesses.Bitmex.Testnet.Key
+		bitmexSecret = updConfig.GetConfig().Accesses.Bitmex.Testnet.Secret
 	}
 
 	tradeAPI := tradeapi.NewTradeAPI(
