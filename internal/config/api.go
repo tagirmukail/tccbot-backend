@@ -45,7 +45,7 @@ type Access struct {
 	}
 }
 
-func initExchangesApi() ExchangesSettings {
+func initExchangesAPI() ExchangesSettings {
 	var bitmex APISettings
 	bitmexSettings := viper.GetStringMap("exchanges_settings.bitmex")
 	if len(bitmexSettings) == 0 {

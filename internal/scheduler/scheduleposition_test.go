@@ -12,12 +12,12 @@ import (
 func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 	type fields struct {
 		log              *logrus.Logger
-		cfg              *config.GlobalConfig
 		pnlT             positionPnl
 		positionPnlLimit int
 	}
 	type args struct {
-		p *positionPnl
+		cfg *config.GlobalConfig
+		p   *positionPnl
 	}
 	tests := []struct {
 		name    string
@@ -30,6 +30,12 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			name: "update o.pnlT - profit",
 			fields: fields{
 				log: logrus.New(),
+				pnlT: positionPnl{
+					pnl: 0.04,
+					t:   Profit,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					Scheduler: config.Scheduler{
 						Position: config.PositionScheduler{
@@ -39,12 +45,6 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 						},
 					},
 				},
-				pnlT: positionPnl{
-					pnl: 0.04,
-					t:   Profit,
-				},
-			},
-			args: args{
 				p: &positionPnl{
 					pnl: 0.08,
 					t:   Profit,
@@ -60,6 +60,12 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			name: "2 update o.pnlT - profit",
 			fields: fields{
 				log: logrus.New(),
+				pnlT: positionPnl{
+					pnl: 0.04,
+					t:   Profit,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					Scheduler: config.Scheduler{
 						Position: config.PositionScheduler{
@@ -69,12 +75,6 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 						},
 					},
 				},
-				pnlT: positionPnl{
-					pnl: 0.04,
-					t:   Profit,
-				},
-			},
-			args: args{
 				p: &positionPnl{
 					pnl: 0.06,
 					t:   Profit,
@@ -90,6 +90,12 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			name: "place order o.pnlT - profit",
 			fields: fields{
 				log: logrus.New(),
+				pnlT: positionPnl{
+					pnl: 0.05,
+					t:   Profit,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					Scheduler: config.Scheduler{
 						Position: config.PositionScheduler{
@@ -99,12 +105,6 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 						},
 					},
 				},
-				pnlT: positionPnl{
-					pnl: 0.05,
-					t:   Profit,
-				},
-			},
-			args: args{
 				p: &positionPnl{
 					pnl: 0.019,
 					t:   Profit,
@@ -120,6 +120,12 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 			name: "not place order o.pnlT - profit, p.pnl less than o.pnlT.pnl",
 			fields: fields{
 				log: logrus.New(),
+				pnlT: positionPnl{
+					pnl: 0.05,
+					t:   Profit,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					Scheduler: config.Scheduler{
 						Position: config.PositionScheduler{
@@ -129,12 +135,6 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 						},
 					},
 				},
-				pnlT: positionPnl{
-					pnl: 0.05,
-					t:   Profit,
-				},
-			},
-			args: args{
 				p: &positionPnl{
 					pnl: 0.021,
 					t:   Profit,
@@ -152,11 +152,10 @@ func TestPositionScheduler_checkPlaceOrder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			o := &PositionScheduler{
 				log:              tt.fields.log,
-				cfg:              tt.fields.cfg,
 				pnlT:             tt.fields.pnlT,
 				positionPnlLimit: tt.fields.positionPnlLimit,
 			}
-			got := o.checkPlaceOrder(tt.args.p)
+			got := o.checkPlaceOrder(tt.args.cfg, tt.args.p)
 			require.Equal(t, tt.want, got)
 			require.Equal(t, tt.wantPnl, o.pnlT)
 		})

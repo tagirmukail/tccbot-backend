@@ -1,12 +1,12 @@
 package config
 
 import (
-	"database/sql"
-	"os"
-	"os/signal"
+	"fmt"
 	"sync"
-	"syscall"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/viper"
 
 	"github.com/sirupsen/logrus"
 
@@ -24,19 +24,19 @@ type Configurator struct {
 }
 
 func NewConfigurator(cfgFile string, updPeriodSec time.Duration) (*Configurator, error) {
-	cfg, err := ParseConfig(cfgFile)
-	if err != nil {
-		return nil, err
-	}
 
-	updCfg := &Configurator{
+	cfgurtr := &Configurator{
 		cfgFile:      cfgFile,
 		mx:           sync.Mutex{},
 		updPeriodSec: updPeriodSec,
-		cfg:          cfg,
 	}
 
-	return updCfg, nil
+	err := cfgurtr.parseConfig(cfgFile)
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	return cfgurtr, nil
 }
 
 func (u *Configurator) SetDB(db db.DatabaseManager) {
@@ -47,72 +47,10 @@ func (u *Configurator) GetConfig() (*GlobalConfig, error) {
 	u.mx.Lock()
 	defer u.mx.Unlock()
 	return u.cfg, nil
-	//if u.cfg != nil && u.cfg.UpdatedAt.Add(u.updPeriodSec).After(time.Now()) {
-	//	copyCfg := *u.cfg
-	//	u.mx.Unlock()
-	//	return &copyCfg, nil
-	//}
-	u.mx.Unlock()
-
-	cfgM, err := u.db.GetConfiguration()
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return nil, err
-		}
-
-		err = u.update()
-		if err != nil {
-			return nil, err
-		}
-		cfgM, err = u.db.GetConfiguration()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	cfg := toGlobalConfig(*cfgM)
-
-	return &cfg, nil
 }
 
-func (u *Configurator) SetConfig(cfg *GlobalConfig) {
-	u.mx.Lock()
-	u.cfg = cfg
-	u.mx.Unlock()
-}
-
-func (u *Configurator) UpdateRun() {
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
-
-	tick := time.NewTicker(u.updPeriodSec)
-	defer tick.Stop()
-
-	for {
-		select {
-		case <-done:
-			return
-		case <-tick.C:
-			err := u.update()
-			if err != nil {
-				logrus.Fatal(err)
-			}
-		}
-	}
-}
-
-func (u *Configurator) update() error {
-	cfg, err := ParseConfig(u.cfgFile)
-	if err != nil {
-		return errors.Errorf("parse tccbot configuration file %s failed: %v", u.cfgFile, err)
-	}
-
-	u.mx.Lock()
-	u.cfg = cfg
-	u.cfg.UpdatedAt = time.Now()
-	u.mx.Unlock()
-
-	cfgM, err := toModelConfiguration(*cfg)
+func (u *Configurator) Update() error {
+	cfgM, err := toModelConfiguration(*u.cfg)
 	if err != nil {
 		return errors.Errorf("conversation configuration to model failed: file %s, error: %v", u.cfgFile, err)
 	}
@@ -121,6 +59,57 @@ func (u *Configurator) update() error {
 	if err != nil {
 		return errors.Errorf("save configuration to database failed: file %s, error: %v", u.cfgFile, err)
 	}
+
+	return nil
+}
+
+func (u *Configurator) parseConfig(cfgFile string) error {
+	viper.SetConfigFile(cfgFile)
+
+	err := viper.ReadInConfig()
+	if err != nil {
+		return err
+	}
+
+	viper.WatchConfig()
+	viper.OnConfigChange(func(e fsnotify.Event) {
+		u.mx.Lock()
+		defer u.mx.Unlock()
+		u.cfg = &GlobalConfig{
+			GlobStrategies:    initGlobStrategies(),
+			ExchangesSettings: initExchangesAPI(),
+			Admin: Admin{
+				Username:    viper.GetString("admin.username"),
+				SecretToken: viper.GetString("admin.secret_token"),
+			},
+			Accesses:         initExchangesAccesses(),
+			DBPath:           initDBPath(),
+			Scheduler:        initSchedulers(),
+			OrdProcPeriodSec: viper.GetInt("ord_proc_period_sec"),
+		}
+		err := u.Update()
+		if err != nil {
+			logrus.Fatal(err)
+		}
+	})
+
+	u.mx.Lock()
+	defer u.mx.Unlock()
+	u.cfg = &GlobalConfig{
+		GlobStrategies:    initGlobStrategies(),
+		ExchangesSettings: initExchangesAPI(),
+		Admin: Admin{
+			Username:    viper.GetString("admin.username"),
+			SecretToken: viper.GetString("admin.secret_token"),
+		},
+		Accesses:         initExchangesAccesses(),
+		DBPath:           initDBPath(),
+		Scheduler:        initSchedulers(),
+		OrdProcPeriodSec: viper.GetInt("ord_proc_period_sec"),
+	}
+	fmt.Println("--------------------------------------------")
+	fmt.Printf("global cfg: %#v\n", u.cfg)
+	fmt.Println("--------------------------------------------")
 
 	return nil
 }

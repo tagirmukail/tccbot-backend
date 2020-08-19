@@ -1,6 +1,10 @@
 package config
 
-import "github.com/spf13/viper"
+import (
+	"fmt"
+
+	"github.com/spf13/viper"
+)
 
 type Scheduler struct {
 	Position PositionScheduler
@@ -16,7 +20,7 @@ type PositionScheduler struct {
 }
 
 func initSchedulers() Scheduler {
-	return Scheduler{
+	schdl := Scheduler{
 		Position: PositionScheduler{
 			Enable:         viper.GetBool("scheduler.position.enable"),
 			PriceTrailing:  viper.GetFloat64("scheduler.position.trailing_price"),
@@ -26,4 +30,9 @@ func initSchedulers() Scheduler {
 			LossPnlDiff:    viper.GetFloat64("scheduler.position.loss_pnl_diff"),
 		},
 	}
+
+	fmt.Println("--------------------------------------------")
+	fmt.Printf("scheduler: %#v\n", schdl)
+	fmt.Println("--------------------------------------------")
+	return schdl
 }

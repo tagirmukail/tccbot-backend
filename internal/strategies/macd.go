@@ -18,7 +18,12 @@ func (s *Strategies) processMACDStrategy(binSize string) error { // nolint:funle
 		return err
 	}
 
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
+	scfg, err := s.configurator.GetConfig()
+	if err != nil {
+		s.log.Fatal(err)
+	}
+
+	cfg := scfg.GlobStrategies.GetCfgByBinSize(binSize)
 	count := cfg.MacdSlowCount + cfg.MacdSigCount
 
 	fromTime, err := utils.FromTime(time.Now().UTC(), binSize, count)
@@ -27,7 +32,7 @@ func (s *Strategies) processMACDStrategy(binSize string) error { // nolint:funle
 	}
 
 	candles, err := s.tradeAPI.GetBitmex().GetTradeBucketed(&bitmex.TradeGetBucketedParams{
-		Symbol:    s.cfg.ExchangesSettings.Bitmex.Symbol,
+		Symbol:    scfg.ExchangesSettings.Bitmex.Symbol,
 		BinSize:   binSize,
 		Count:     int32(count),
 		StartTime: fromTime.Format(bitmex.TradeTimeFormat),
@@ -56,14 +61,14 @@ func (s *Strategies) processMACDStrategy(binSize string) error { // nolint:funle
 
 	macd := s.tradeCalc.CalcMACD(
 		closes,
-		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount, talib.EMA,
-		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount, talib.EMA,
-		s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount, talib.WMA,
+		scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount, talib.EMA,
+		scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount, talib.EMA,
+		scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount, talib.WMA,
 	)
 	signal := models.Signal{
-		MACDFast:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount,
-		MACDSlow:           s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount,
-		MACDSig:            s.cfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount,
+		MACDFast:           scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdFastCount,
+		MACDSlow:           scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSlowCount,
+		MACDSig:            scfg.GlobStrategies.GetCfgByBinSize(binSize).MacdSigCount,
 		BinSize:            bin,
 		Timestamp:          lastCandleTS,
 		SignalType:         models.MACD,

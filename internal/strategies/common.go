@@ -32,22 +32,6 @@ func (s *Strategies) fetchTSFromCandles(candles []bitmex.TradeBuck) ([]time.Time
 	return result, nil
 }
 
-func (s *Strategies) retryProcess( // nolint:unused
-	candles []bitmex.TradeBuck,
-	binSize models.BinSize,
-	retryFunc func(candles []bitmex.TradeBuck, binSize models.BinSize) error,
-) error {
-	var err error
-	for i := 0; i < s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String()).RetryProcessCount; i++ {
-		err = retryFunc(candles, binSize)
-		if err == nil {
-			break
-		}
-		s.log.Errorf("retryProcess error: %v", err)
-	}
-	return err
-}
-
 func (s *Strategies) checkCloses(candles []bitmex.TradeBuck) error {
 	for _, candle := range candles {
 		if candle.Close == 0 {

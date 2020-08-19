@@ -4,6 +4,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/tagirmukail/tccbot-backend/internal/config"
+
 	"github.com/sirupsen/logrus"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 
@@ -36,8 +38,8 @@ func fetchCloses(candles []bitmex.TradeBuck) []float64 {
 	return result
 }
 
-func (s *BBRSIStrategy) getCandles(binSize models.BinSize) ([]bitmex.TradeBuck, error) {
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(binSize.String())
+func (s *BBRSIStrategy) getCandles(scfg *config.GlobalConfig, binSize models.BinSize) ([]bitmex.TradeBuck, error) {
+	cfg := scfg.GlobStrategies.GetCfgByBinSize(binSize.String())
 	var count int
 	if cfg.RsiCount > cfg.GetCandlesCount {
 		count = cfg.RsiCount * 2
@@ -64,8 +66,8 @@ func fetchTSFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
 	return result, nil
 }
 
-func (s *BBRSIStrategy) fetchLastCandlesForBB(binSize string, candles []bitmex.TradeBuck) []bitmex.TradeBuck {
-	lastIndx := len(candles) - s.cfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount
+func (s *BBRSIStrategy) fetchLastCandlesForBB(scfg *config.GlobalConfig, binSize string, candles []bitmex.TradeBuck) []bitmex.TradeBuck {
+	lastIndx := len(candles) - scfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount
 	if lastIndx < 0 {
 		return nil
 	}

@@ -27,20 +27,26 @@ type OrderProcessor struct {
 	tickPeriod      time.Duration
 	api             tradeapi.API
 	log             *logrus.Logger
-	cfg             *config.GlobalConfig
+	configurator    *config.Configurator
 	mx              sync.Mutex
 	currentPosition *bitmex.Position
 }
 
 func New(
-	api tradeapi.API, cfg *config.GlobalConfig, log *logrus.Logger,
+	api tradeapi.API, configurator *config.Configurator, log *logrus.Logger,
 ) *OrderProcessor {
 	rand.Seed(time.Now().UnixNano())
+
+	cfg, err := configurator.GetConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	return &OrderProcessor{
-		tickPeriod: time.Duration(cfg.OrdProcPeriodSec) * time.Second,
-		api:        api,
-		cfg:        cfg,
-		log:        log,
+		tickPeriod:   time.Duration(cfg.OrdProcPeriodSec) * time.Second,
+		api:          api,
+		configurator: configurator,
+		log:          log,
 	}
 }
 
@@ -90,6 +96,10 @@ func (o *OrderProcessor) PlaceOrder(
 	amount float64,
 	passive bool,
 ) (order interface{}, err error) {
+	cfg, err := o.configurator.GetConfig()
+	if err != nil {
+		o.log.Fatal(err)
+	}
 	switch exchange {
 	case types.Bitmex:
 		_, availableBalance, err := o.GetBalance()
@@ -100,11 +110,11 @@ func (o *OrderProcessor) PlaceOrder(
 		if contracts <= limitBalanceContracts {
 			return nil, fmt.Errorf("balance is exhausted, %.3f left", availableBalance)
 		}
-		err = o.checkLimitContracts(side)
+		err = o.checkLimitContracts(cfg, side)
 		if err != nil {
 			return nil, err
 		}
-		inst, err := o.getInstrument()
+		inst, err := o.getInstrument(cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -120,19 +130,16 @@ func (o *OrderProcessor) PlaceOrder(
 			if err != nil {
 				return nil, err
 			}
-			amount, err = o.calcOrderQty(
-				availableBalance,
-				side,
-			)
+			amount, err = o.calcOrderQty(cfg, availableBalance, side)
 			if err != nil {
 				return nil, err
 			}
 		}
 
 		params := &bitmex.OrderNewParams{
-			Symbol:    o.cfg.ExchangesSettings.Bitmex.Symbol,
+			Symbol:    cfg.ExchangesSettings.Bitmex.Symbol,
 			Side:      string(side),
-			OrderType: string(o.cfg.ExchangesSettings.Bitmex.OrderType),
+			OrderType: string(cfg.ExchangesSettings.Bitmex.OrderType),
 			OrderQty:  math.Round(amount),
 			Price:     price,
 		}
@@ -159,21 +166,27 @@ func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, 
 	if len(margins) == 0 {
 		return 0, 0, errors.New("user margins not exist")
 	}
+
+	cfg, err := o.configurator.GetConfig()
+	if err != nil {
+		o.log.Fatal(err)
+	}
+
 	for _, margin := range margins {
-		if o.cfg.ExchangesSettings.Bitmex.Currency == margin.Currency {
+		if cfg.ExchangesSettings.Bitmex.Currency == margin.Currency {
 			walletBalance = trademath.ConvertToBTC(margin.WalletBalance)
 			availableBalance = trademath.ConvertToBTC(margin.AvailableMargin)
 			return walletBalance, availableBalance, nil
 		}
 	}
 
-	return 0, 0, fmt.Errorf("user margin by currency:%s not exist", o.cfg.ExchangesSettings.Bitmex.Currency)
+	return 0, 0, fmt.Errorf("user margin by currency:%s not exist", cfg.ExchangesSettings.Bitmex.Currency)
 }
 
-func (o *OrderProcessor) getInstrument() (bitmex.Instrument, error) {
+func (o *OrderProcessor) getInstrument(cfg *config.GlobalConfig) (bitmex.Instrument, error) {
 	var resp bitmex.Instrument
 	insts, err := o.api.GetBitmex().GetInstrument(bitmex.InstrumentRequestParams{
-		Symbol:  o.cfg.ExchangesSettings.Bitmex.Symbol,
+		Symbol:  cfg.ExchangesSettings.Bitmex.Symbol,
 		Columns: "lastPrice,bidPrice,midPrice,askPrice,markPrice",
 		Count:   1,
 	})
@@ -203,23 +216,23 @@ func (o *OrderProcessor) getPosition(symbol string) (bitmex.Position, error) {
 	return bitmex.Position{}, nil
 }
 
-func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
+func (o *OrderProcessor) checkLimitContracts(cfg *config.GlobalConfig, side types.Side) error {
 	currentPosition, ok := o.GetPosition()
 	if !ok {
 		return nil
 	}
 	switch side {
 	case types.SideSell:
-		isLimitedShort := currentPosition.CurrentQty <= -int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedShort := currentPosition.CurrentQty <= -int64(cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedShort {
 			return fmt.Errorf("place sell order limitted - qty: %d, limit: %d",
-				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+				o.currentPosition.CurrentQty, cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		}
 	case types.SideBuy:
-		isLimitedLong := currentPosition.CurrentQty >= int64(o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+		isLimitedLong := currentPosition.CurrentQty >= int64(cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		if isLimitedLong {
 			return fmt.Errorf("place buy order limitted - qty: %d, limit: %d",
-				o.currentPosition.CurrentQty, o.cfg.ExchangesSettings.Bitmex.LimitContractsCount)
+				o.currentPosition.CurrentQty, cfg.ExchangesSettings.Bitmex.LimitContractsCount)
 		}
 	default:
 		break
@@ -228,7 +241,7 @@ func (o *OrderProcessor) checkLimitContracts(side types.Side) error {
 }
 
 // calcOrderQty in contracts
-func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyContrts float64, err error) {
+func (o *OrderProcessor) calcOrderQty(cfg *config.GlobalConfig, balance float64, side types.Side) (qtyContrts float64, err error) {
 	position, ok := o.GetPosition()
 	if ok {
 		if position.CurrentQty > 0 {
@@ -240,9 +253,9 @@ func (o *OrderProcessor) calcOrderQty(balance float64, side types.Side) (qtyCont
 	var qtyBtc float64
 	switch side {
 	case types.SideBuy:
-		qtyBtc = balance * o.cfg.ExchangesSettings.Bitmex.BuyOrderCoef
+		qtyBtc = balance * cfg.ExchangesSettings.Bitmex.BuyOrderCoef
 	case types.SideSell:
-		qtyBtc = balance * o.cfg.ExchangesSettings.Bitmex.SellOrderCoef
+		qtyBtc = balance * cfg.ExchangesSettings.Bitmex.SellOrderCoef
 	default:
 		err = fmt.Errorf("unknown side type: %s", side)
 		return

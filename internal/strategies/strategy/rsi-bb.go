@@ -22,18 +22,18 @@ import (
 )
 
 type BBRSIStrategy struct {
-	cfg       *config.GlobalConfig
-	api       tradeapi.API
-	math      trademath.Calc
-	orderProc *orderproc.OrderProcessor
-	log       *logrus.Logger
-	db        db.DatabaseManager
-	caches    candlecache.Caches
-	filters   []filter.Filter
+	configurator *config.Configurator
+	api          tradeapi.API
+	math         trademath.Calc
+	orderProc    *orderproc.OrderProcessor
+	log          *logrus.Logger
+	db           db.DatabaseManager
+	caches       candlecache.Caches
+	filters      []filter.Filter
 }
 
 func NewBBRSIStrategy(
-	cfg *config.GlobalConfig,
+	configurator *config.Configurator,
 	api tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
 	db db.DatabaseManager,
@@ -42,14 +42,14 @@ func NewBBRSIStrategy(
 	filters ...filter.Filter,
 ) *BBRSIStrategy {
 	return &BBRSIStrategy{
-		cfg:       cfg,
-		api:       api,
-		orderProc: orderProc,
-		db:        db,
-		log:       log,
-		math:      trademath.Calc{},
-		caches:    caches,
-		filters:   filters,
+		configurator: configurator,
+		api:          api,
+		orderProc:    orderProc,
+		db:           db,
+		log:          log,
+		math:         trademath.Calc{},
+		caches:       caches,
+		filters:      filters,
 	}
 }
 
@@ -57,29 +57,34 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	s.log.Infof("start execute bb rsi strategy")
 	defer s.log.Infof("finish execute bb rsi strategy")
 
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	scfg, err := s.configurator.GetConfig()
+	if err != nil {
+		s.log.Fatal(err)
+	}
+
+	cfg := scfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
 		return errors.New("cfg by bin size is empty")
 	}
 
 	if cfg.CandlesFilterEnable && len(s.filters) == 0 {
-		s.filters = append(s.filters, filter.NewCandlesFilter(s.cfg, s.log))
+		s.filters = append(s.filters, filter.NewCandlesFilter(scfg, s.log))
 	}
 	if cfg.TrendFilterEnable && len(s.filters) == 0 {
-		s.filters = append(s.filters, filter.NewTrendFilter(s.cfg, s.log))
+		s.filters = append(s.filters, filter.NewTrendFilter(scfg, s.log))
 	}
 
-	candles, err := s.getCandles(size)
+	candles, err := s.getCandles(scfg, size)
 	if err != nil {
 		return err
 	}
 
-	rsi, err := s.processRsi(candles, size)
+	rsi, err := s.processRsi(scfg, candles, size)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.processBB(candles, size)
+	_, err = s.processBB(scfg, candles, size)
 	if err != nil {
 		return err
 	}
@@ -91,7 +96,7 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 		action        stratypes.Action
 	)
 	if rsi.Value >= float64(cfg.RsiMaxBorder) || rsi.Value <= float64(cfg.RsiMinBorder) {
-		lastCandles = s.fetchLastCandlesForBB(size.String(), candles)
+		lastCandles = s.fetchLastCandlesForBB(scfg, size.String(), candles)
 		if len(lastCandles) == 0 {
 			err := errors.New("processBB last candles fo BB signal is empty")
 			s.log.Debug(err)
@@ -144,11 +149,11 @@ func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.T
 	return applySide
 }
 
-func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSize) (rsi trademath.RSI, err error) {
+func (s *BBRSIStrategy) processRsi(scfg *config.GlobalConfig, candles []bitmex.TradeBuck, size models.BinSize) (rsi trademath.RSI, err error) {
 	s.log.Infof("start process rsi signal")
 	defer s.log.Infof("finish process rsi signal")
 
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	cfg := scfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
 		return rsi, errors.New("cfg by bin size is empty")
 	}
@@ -185,9 +190,9 @@ func (s *BBRSIStrategy) processRsi(candles []bitmex.TradeBuck, size models.BinSi
 }
 
 func (s *BBRSIStrategy) processBB(
-	candles []bitmex.TradeBuck, size models.BinSize,
+	scfg *config.GlobalConfig, candles []bitmex.TradeBuck, size models.BinSize,
 ) (bb trademath.BB, err error) {
-	cfg := s.cfg.GlobStrategies.GetCfgByBinSize(size.String())
+	cfg := scfg.GlobStrategies.GetCfgByBinSize(size.String())
 	if cfg == nil {
 		return bb, errors.New("cfg by bin size is empty")
 	}
