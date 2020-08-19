@@ -11,7 +11,6 @@ import (
 	_ "github.com/mattn/go-sqlite3" // comment
 	"github.com/sirupsen/logrus"
 
-	"github.com/tagirmukail/tccbot-backend/internal/config"
 	migrateDb "github.com/tagirmukail/tccbot-backend/internal/db/migrate-db"
 	"github.com/tagirmukail/tccbot-backend/internal/db/models"
 	"github.com/tagirmukail/tccbot-backend/pkg/tradeapi/bitmex"
@@ -36,6 +35,10 @@ type DatabaseManager interface {
 	//GetCandleWithSignals(id int64) (*models.CandleWithSignals, error)
 	//GetLastCandlesWithSignals(theme types.Theme, n int, limit int) ([]*models.CandleWithSignals, error)
 	SaveOrder(ord bitmex.OrderCopied) (*models.Order, error)
+
+	// Configuration
+	GetConfiguration() (cfg *models.GlobalConfig, err error)
+	SaveConfiguration(config models.GlobalConfig) error
 }
 
 type QueryLogger struct {
@@ -72,39 +75,40 @@ type DB struct {
 }
 
 func NewDB(
-	cfg *config.GlobalConfig, db *sqlx.DB, log *logrus.Logger, command migrateDb.Command, step int,
-) (*DB, error) {
+	dbPath string, db *sqlx.DB, log *logrus.Logger, command migrateDb.Command, step int,
+) (*DB, string, error) {
 	var err error
 	manager := &DB{
 		log:   log,
 		retry: defaultRetryCount,
 	}
-	if cfg.DBPath == "" {
-		cfg.DBPath = "sqlite3://tccbot_db?x-migrations-table=schema_migrations"
+
+	if dbPath == "" {
+		dbPath = "sqlite3://tccbot_db?x-migrations-table=schema_migrations"
 	}
 
 	var dbfile string
 	if db == nil {
-		purl, err := nurl.Parse(cfg.DBPath)
+		purl, err := nurl.Parse(dbPath)
 		if err != nil {
-			return nil, err
+			return nil, dbPath, err
 		}
 		dbfile = strings.Replace(migrate.FilterCustomQuery(purl).String(), "sqlite3://", "", 1)
 		db, err = sqlx.Open("sqlite3", dbfile)
 		if err != nil {
-			return nil, err
+			return nil, dbPath, err
 		}
 	}
 
 	manager.db = db
 	err = db.Ping()
 	if err != nil {
-		return nil, err
+		return nil, dbPath, err
 	}
 
-	err = migrateDb.Migrate(cfg.DBPath, command, step)
+	err = migrateDb.Migrate(dbPath, command, step)
 	if err != nil && err != migrate.ErrNoChange {
-		return nil, err
+		return nil, dbPath, err
 	}
 
 	manager.ql = &QueryLogger{
@@ -112,7 +116,7 @@ func NewDB(
 		execer:  db,
 		logger:  log,
 	}
-	return manager, nil
+	return manager, dbPath, nil
 }
 
 func (db *DB) Close() error {

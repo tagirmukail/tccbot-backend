@@ -12,10 +12,10 @@ import (
 
 func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	type fields struct {
-		cfg      *config.GlobalConfig
 		position *bitmex.Position
 	}
 	type args struct {
+		cfg     *config.GlobalConfig
 		balance float64
 		side    types.Side
 	}
@@ -29,6 +29,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	t.Run("pnl > 0 and curency qty > 0", func(t *testing.T) {
 		tt := test{
 			fields: fields{
+				position: &bitmex.Position{
+					CurrentQty:    345,
+					UnrealisedPnl: 163,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.APISettings{
@@ -37,12 +43,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-				position: &bitmex.Position{
-					CurrentQty:    345,
-					UnrealisedPnl: 163,
-				},
-			},
-			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -51,9 +51,8 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 
 		o := &OrderProcessor{
 			currentPosition: tt.fields.position,
-			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.cfg, tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -61,6 +60,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	t.Run("pnl < 0 and currency qty == 0", func(t *testing.T) {
 		tt := test{
 			fields: fields{
+				position: &bitmex.Position{
+					OpeningQty:    0,
+					UnrealisedPnl: -100,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.APISettings{
@@ -69,12 +74,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-				position: &bitmex.Position{
-					OpeningQty:    0,
-					UnrealisedPnl: -100,
-				},
-			},
-			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -83,9 +82,8 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 
 		o := &OrderProcessor{
 			currentPosition: tt.fields.position,
-			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.cfg, tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -93,6 +91,13 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	t.Run("pnl == 0 and currency qty == 0", func(t *testing.T) {
 		tt := test{
 			fields: fields{
+
+				position: &bitmex.Position{
+					OpeningQty:    0,
+					UnrealisedPnl: 0,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.APISettings{
@@ -101,12 +106,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-				position: &bitmex.Position{
-					OpeningQty:    0,
-					UnrealisedPnl: 0,
-				},
-			},
-			args: args{
 				balance: 0.0090,
 				side:    types.SideSell,
 			},
@@ -114,10 +113,9 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg:             tt.fields.cfg,
 			currentPosition: tt.fields.position,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.cfg, tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -129,6 +127,8 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 					OpeningQty:    0,
 					UnrealisedPnl: 0,
 				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.APISettings{
@@ -137,8 +137,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-			},
-			args: args{
 				balance: 0.0090,
 				side:    types.SideEmpty,
 			},
@@ -148,9 +146,8 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 
 		o := &OrderProcessor{
 			currentPosition: tt.fields.position,
-			cfg:             tt.fields.cfg,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.cfg, tt.args.balance, tt.args.side)
 		require.EqualError(t, err, tt.wantErr.Error())
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})
@@ -158,6 +155,12 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 	t.Run("pnl == 0 and currency qty == 0", func(t *testing.T) {
 		tt := test{
 			fields: fields{
+				position: &bitmex.Position{
+					OpeningQty:    0,
+					UnrealisedPnl: 0,
+				},
+			},
+			args: args{
 				cfg: &config.GlobalConfig{
 					ExchangesSettings: config.ExchangesSettings{
 						Bitmex: config.APISettings{
@@ -166,12 +169,6 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 						},
 					},
 				},
-				position: &bitmex.Position{
-					OpeningQty:    0,
-					UnrealisedPnl: 0,
-				},
-			},
-			args: args{
 				balance: 0.0090,
 				side:    types.SideBuy,
 			},
@@ -179,10 +176,9 @@ func TestOrderProcessor_calcOrderQty(t *testing.T) {
 		}
 
 		o := &OrderProcessor{
-			cfg:             tt.fields.cfg,
 			currentPosition: tt.fields.position,
 		}
-		gotQtyContrts, err := o.calcOrderQty(tt.args.balance, tt.args.side)
+		gotQtyContrts, err := o.calcOrderQty(tt.args.cfg, tt.args.balance, tt.args.side)
 		require.NoError(t, err)
 		require.Equal(t, tt.wantQtyContrts, gotQtyContrts)
 	})

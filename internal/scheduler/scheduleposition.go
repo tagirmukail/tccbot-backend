@@ -43,7 +43,7 @@ type PositionScheduler struct {
 	api                  tradeapi.API
 	orderProc            *orderproc.OrderProcessor
 	log                  *logrus.Logger
-	cfg                  *config.GlobalConfig
+	configurator         *config.Configurator
 	bitmexDataSubscriber *betrayed.Subscriber
 	pnlT                 positionPnl
 	positionPnlLimit     int
@@ -52,7 +52,7 @@ type PositionScheduler struct {
 // TODO смотреть изменения ордеров по ws, проверять активные, исполненые, отклоненые в procActiveOrders()
 // TODO добавить в конфигурацию настройку для включения определенного шедулера
 func NewPositionScheduler(
-	cfg *config.GlobalConfig,
+	configurator *config.Configurator,
 	positionPnlLimit int,
 	api tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
@@ -63,7 +63,7 @@ func NewPositionScheduler(
 		orderProc:            orderProc,
 		api:                  api,
 		log:                  log,
-		cfg:                  cfg,
+		configurator:         configurator,
 		bitmexDataSubscriber: bitmexDataSubscriber,
 		positionPnlLimit:     positionPnlLimit,
 	}
@@ -79,7 +79,12 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, syscall.SIGTERM, syscall.SIGINT)
 
-	activeOrdersTick := time.NewTicker(time.Duration(o.cfg.OrdProcPeriodSec) * time.Second)
+	cfg, err := o.configurator.GetConfig()
+	if err != nil {
+		o.log.Fatal(err)
+	}
+
+	activeOrdersTick := time.NewTicker(time.Duration(cfg.OrdProcPeriodSec) * time.Second)
 	positionCleanTick := time.NewTicker(expirePositionDuration)
 	defer func() {
 		activeOrdersTick.Stop()
@@ -95,7 +100,7 @@ func (o *PositionScheduler) Start(wg *sync.WaitGroup) {
 				o.processPosition(tradeData.Data)
 			}
 		case <-activeOrdersTick.C:
-			err := o.procActiveOrders()
+			err = o.procActiveOrders()
 			if err != nil {
 				o.log.Errorf("o.procActiveOrders() failed: %v", err)
 			}
@@ -124,7 +129,12 @@ func (o *PositionScheduler) Stop() error {
 }
 
 func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData) {
-	orders, err := getActiveOrders(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+	cfg, err := o.configurator.GetConfig()
+	if err != nil {
+		o.log.Fatal(err)
+	}
+
+	orders, err := getActiveOrders(o.api, cfg.ExchangesSettings.Bitmex.Symbol)
 	if err != nil {
 		o.log.Errorf("get active orders failed: %v", err)
 		return
@@ -138,10 +148,10 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 	for _, positionData := range positions {
 		o.log.Debugf("PositionScheduler.Start process data : %#v", positionData)
 		var (
-			position = &bitmex.Position{}
+			position *bitmex.Position
 			err      error
 		)
-		if string(positionData.Symbol) == o.cfg.ExchangesSettings.Bitmex.Symbol {
+		if string(positionData.Symbol) == cfg.ExchangesSettings.Bitmex.Symbol {
 			position, err = FromBitmexIncDataToPosition(positionData)
 			if err != nil {
 				o.log.Errorf("[bitmex exchange data]:%#v convert to position failed [err]:%v",
@@ -169,24 +179,23 @@ func (o *PositionScheduler) processPosition(positions []data.BitmexIncomingData)
 			pos.AvgCostPrice, pos.LastPrice, pos.CurrentQty)
 
 		unrealisedPnl := trademath.CalculateUnrealizedPNL(pos.AvgCostPrice, pos.LastPrice, pos.CurrentQty)
-		//unrealisedPnl := trademath.ConvertToBTC(position.UnrealisedPnl)
 		o.log.Debugf("current position [unrealised pnl in btc]: %.9f", unrealisedPnl)
 		var pnlType = Neutral
-		if unrealisedPnl >= o.cfg.Scheduler.Position.ProfitCloseBTC {
+		if unrealisedPnl >= cfg.Scheduler.Position.ProfitCloseBTC {
 			pnlType = Profit
-		} else if unrealisedPnl <= -o.cfg.Scheduler.Position.LossCloseBTC {
+		} else if unrealisedPnl <= -cfg.Scheduler.Position.LossCloseBTC {
 			pnlType = Loss
 		}
 
-		o.processPnl(&positionPnl{
+		o.processPnl(cfg, &positionPnl{
 			pnl: unrealisedPnl,
 			t:   pnlType,
 		}, *position)
 	}
 }
 
-func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position) {
-	if !o.checkPlaceOrder(p) {
+func (o *PositionScheduler) processPnl(cfg *config.GlobalConfig, p *positionPnl, position bitmex.Position) {
+	if !o.checkPlaceOrder(cfg, p) {
 		return
 	}
 
@@ -199,8 +208,7 @@ func (o *PositionScheduler) processPnl(p *positionPnl, position bitmex.Position)
 	o.clearPositionPnl()
 }
 
-// TODO unit tests
-func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
+func (o *PositionScheduler) checkPlaceOrder(cfg *config.GlobalConfig, p *positionPnl) bool {
 	var placeOrder bool
 	switch {
 	case o.pnlT.t == Profit && p.t == Loss:
@@ -210,16 +218,16 @@ func (o *PositionScheduler) checkPlaceOrder(p *positionPnl) bool {
 			"[pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
-	case o.pnlT.t == Profit && p.pnl+o.cfg.Scheduler.Position.ProfitPnlDiff <= o.pnlT.pnl:
+	case o.pnlT.t == Profit && p.pnl+cfg.Scheduler.Position.ProfitPnlDiff <= o.pnlT.pnl:
 		placeOrder = true
-	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.LossPnlDiff):
+	case o.pnlT.t == Loss && p.pnl < o.pnlT.pnl-(cfg.Scheduler.Position.LossPnlDiff):
 		placeOrder = true
 	case o.pnlT.t == Loss && p.pnl > o.pnlT.pnl: // m. b. not needed
 		o.log.Debugf("[o.pnlT.t == Loss && p.pnl > o.pnlT.pnl] we are waiting to check the position, ["+
 			"pnlT]: %#v, [p]: %#v",
 			o.pnlT, p)
 		o.pnlT = *p
-	case o.pnlT.t == Neutral && p.t == Loss && p.pnl < o.pnlT.pnl-(o.cfg.Scheduler.Position.LossPnlDiff):
+	case o.pnlT.t == Neutral && p.t == Loss && p.pnl < o.pnlT.pnl-(cfg.Scheduler.Position.LossPnlDiff):
 		placeOrder = true
 	case o.pnlT.t == Neutral && p.t == Loss:
 		o.log.Debugf("[o.pnlT.t == Neutral && p.t == Loss] we are waiting to check the position, "+
@@ -257,12 +265,17 @@ func (o *PositionScheduler) placeClosePositionOrder(position bitmex.Position) (i
 }
 
 func (o *PositionScheduler) procActiveOrders() error {
-	orders, err := getActiveOrders(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+	cfg, err := o.configurator.GetConfig()
+	if err != nil {
+		o.log.Fatal(err)
+	}
+
+	orders, err := getActiveOrders(o.api, cfg.ExchangesSettings.Bitmex.Symbol)
 	if err != nil {
 		return err
 	}
 	for _, order := range orders {
-		_, err = o.procActiveOrder(order)
+		_, err = o.procActiveOrder(cfg, order)
 		if err != nil {
 			return err
 		}
@@ -271,23 +284,26 @@ func (o *PositionScheduler) procActiveOrders() error {
 	return nil
 }
 
-func (o *PositionScheduler) procActiveOrder(order bitmex.OrderCopied) (ord bitmex.OrderCopied, err error) {
+func (o *PositionScheduler) procActiveOrder(
+	cfg *config.GlobalConfig, order bitmex.OrderCopied,
+) (ord bitmex.OrderCopied, err error) {
 	for i := 0; i < 5; i++ {
 		var inst bitmex.Instrument
-		inst, err = getInstrument(o.api, o.cfg.ExchangesSettings.Bitmex.Symbol)
+		inst, err = getInstrument(o.api, cfg.ExchangesSettings.Bitmex.Symbol)
 		if err != nil {
+			o.log.WithFields(logrus.Fields{"error": err})
 			continue
 		}
 		var price float64
 		switch types.Side(order.Side) {
 		case types.SideSell:
 			diff := inst.BidPrice - order.Price
-			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
+			if math.Abs(diff) > cfg.Scheduler.Position.PriceTrailing {
 				price = inst.BidPrice + 0.5
 			}
 		case types.SideBuy:
 			diff := inst.AskPrice - order.Price
-			if math.Abs(diff) > o.cfg.Scheduler.Position.PriceTrailing {
+			if math.Abs(diff) > cfg.Scheduler.Position.PriceTrailing {
 				price = inst.AskPrice - 0.5
 			}
 		}

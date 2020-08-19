@@ -10,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
+
+	"github.com/tagirmukail/tccbot-backend/internal/config"
 
 	"github.com/tagirmukail/tccbot-backend/internal/scheduler"
 
@@ -24,7 +27,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/tagirmukail/tccbot-backend/internal/config"
 	"github.com/tagirmukail/tccbot-backend/internal/orderproc"
 	"github.com/tagirmukail/tccbot-backend/internal/strategies"
 	"github.com/tagirmukail/tccbot-backend/internal/types"
@@ -115,13 +117,18 @@ func main() { // nolint:funlen
 	log.Infof("\nversion: %v;\ndate_build: %v;\ngit_hash: %v",
 		Version, DateBuild, GitHash)
 
-	cfg, err := config.ParseConfig(configPath)
+	configurator, err := config.NewConfigurator(configPath, 15*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cfg, err := configurator.GetConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	var dbManager db.DatabaseManager
-	dbManager, err = db.NewDB(cfg, nil, log, migrate_db.Command(migrationCommand), step)
+	dbManager, cfg.DBPath, err = db.NewDB(cfg.DBPath, nil, log, migrate_db.Command(migrationCommand), step)
 	if err != nil {
 		log.Fatalf("migartion failed: %v", err)
 	}
@@ -130,12 +137,18 @@ func main() { // nolint:funlen
 		return
 	}
 
+	configurator.SetDB(dbManager)
+	err = configurator.Update()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var tradeThemes = cfg.GlobStrategies.GetThemes()
 
 	bitmexKey, bitmexSecret := cfg.Accesses.Bitmex.Key, cfg.Accesses.Bitmex.Secret
 	if testMode {
-		bitmexKey, bitmexSecret = cfg.Accesses.Bitmex.Testnet.Key, cfg.Accesses.Bitmex.Testnet.Secret
-
+		bitmexKey = cfg.Accesses.Bitmex.Testnet.Key
+		bitmexSecret = cfg.Accesses.Bitmex.Testnet.Secret
 	}
 
 	tradeAPI := tradeapi.NewTradeAPI(
@@ -158,7 +171,7 @@ func main() { // nolint:funlen
 
 	var bitmexSubscribers []*bitmextradedata.Subscriber
 
-	ordProc := orderproc.New(tradeAPI, cfg, log)
+	ordProc := orderproc.New(tradeAPI, configurator, log)
 
 	caches := candlecache.NewBinToCache(
 		cfg.GlobStrategies.GetBinSizes(), maxCandles, types.Symbol(cfg.ExchangesSettings.Bitmex.Symbol), log,
@@ -175,16 +188,16 @@ func main() { // nolint:funlen
 		bitmexSubsForScheduler := bitmextradedata.NewSubscriber([]types.Theme{types.Position})
 		bitmexSubscribers = append(bitmexSubscribers, bitmexSubsForScheduler)
 		schedulr = scheduler.NewPositionScheduler(
-			cfg, scheduler.LimitPositionPnls, tradeAPI, ordProc, bitmexSubsForScheduler, log,
+			configurator, scheduler.LimitPositionPnls, tradeAPI, ordProc, bitmexSubsForScheduler, log,
 		)
 	}
 
 	bitmexDataSender := bitmextradedata.New(tradeAPI.GetBitmex().GetWS().GetMessages(), log, bitmexSubscribers...)
 
-	bbRsi := strategy.NewBBRSIStrategy(cfg, tradeAPI, ordProc, dbManager, caches, log)
+	bbRsi := strategy.NewBBRSIStrategy(configurator, tradeAPI, ordProc, dbManager, caches, log)
 
 	wg := &sync.WaitGroup{}
-	strategiesTypes := strategies.New(wg, cfg, tradeAPI, ordProc, bitmexDataSender, bitmexSubsTradeForStrategies,
+	strategiesTypes := strategies.New(wg, configurator, tradeAPI, ordProc, bitmexDataSender, bitmexSubsTradeForStrategies,
 		schedulr, dbManager, log, initSignals, bbRsi, caches)
 	strategiesTypes.Start()
 	<-done

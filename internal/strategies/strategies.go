@@ -32,7 +32,7 @@ type Strategies struct {
 		maxBorderInProc bool
 	}
 	wgRunner              *sync.WaitGroup
-	cfg                   *config.GlobalConfig
+	configurator          *config.Configurator
 	tradeAPI              tradeapi.API
 	db                    db.DatabaseManager
 	log                   *logrus.Logger
@@ -50,7 +50,7 @@ type Strategies struct {
 // TODO перенести все параметры в отдельную структуру
 func New(
 	wgRunner *sync.WaitGroup,
-	cfg *config.GlobalConfig,
+	configurator *config.Configurator,
 	tradeAPI tradeapi.API,
 	orderProc *orderproc.OrderProcessor,
 	bitmexDataSender *bitmextradedata.Sender,
@@ -64,7 +64,7 @@ func New(
 ) *Strategies {
 	return &Strategies{
 		wgRunner:              wgRunner,
-		cfg:                   cfg,
+		configurator:          configurator,
 		tradeAPI:              tradeAPI,
 		orderProc:             orderProc,
 		bitmexDataSender:      bitmexDataSender,
@@ -175,7 +175,13 @@ func (s *Strategies) processStrategies(binSize string) {
 		s.log.Warnf("to bin size error: %v", err)
 		return
 	}
-	strategiesConfig := s.cfg.GlobStrategies.GetCfgByBinSize(binSize)
+
+	scfg, err := s.configurator.GetConfig()
+	if err != nil {
+		s.log.Fatal(err)
+	}
+
+	strategiesConfig := scfg.GlobStrategies.GetCfgByBinSize(binSize)
 	if strategiesConfig == nil {
 		s.log.Warnf("strategies not installed for bin_size:%s", binSize)
 		return
