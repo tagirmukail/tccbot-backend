@@ -26,7 +26,7 @@ type Admin struct {
 	Token       string `json:"token"`
 }
 
-//nolint:funlen
+//nolint:funlen,deadcode,unused
 func toGlobalConfig(cfgM models.GlobalConfig) GlobalConfig {
 	var cfg GlobalConfig
 

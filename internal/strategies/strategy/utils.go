@@ -66,7 +66,9 @@ func fetchTSFromCandles(candles []bitmex.TradeBuck) ([]time.Time, error) {
 	return result, nil
 }
 
-func (s *BBRSIStrategy) fetchLastCandlesForBB(scfg *config.GlobalConfig, binSize string, candles []bitmex.TradeBuck) []bitmex.TradeBuck {
+func (s *BBRSIStrategy) fetchLastCandlesForBB(
+	scfg *config.GlobalConfig, binSize string, candles []bitmex.TradeBuck,
+) []bitmex.TradeBuck {
 	lastIndx := len(candles) - scfg.GlobStrategies.GetCfgByBinSize(binSize).BBLastCandlesCount
 	if lastIndx < 0 {
 		return nil

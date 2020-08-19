@@ -180,7 +180,9 @@ func (s *Strategies) rsiSave(
 	return err
 }
 
-func (s *Strategies) otherSignals(cfg *config.GlobalConfig, timestamp time.Time, size models.BinSize, closes []float64, step int) error {
+func (s *Strategies) otherSignals(
+	cfg *config.GlobalConfig, timestamp time.Time, size models.BinSize, closes []float64, step int,
+) error {
 	if step < cfg.GlobStrategies.GetCfgByBinSize(size.String()).GetCandlesCount {
 		return nil
 	}

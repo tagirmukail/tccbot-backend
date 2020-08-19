@@ -454,27 +454,39 @@ func (db *DB) getConfiguration() (*models.GlobalConfig, error) {
 		CROSS JOIN exchange_access as ea ON ea.global_id=gc.id
 		CROSS JOIN scheduler as s ON s.global_id=gc.id
 		CROSS JOIN strategies_config as sc ON sc.global_id=gc.id LIMIT 1`).Scan(
-		&globalConfig.ID, &globalConfig.DBPath, &globalConfig.OrderProcPeriodInSec, &globalConfig.CreatedAt, &globalConfig.UpdatedAt,
+		&globalConfig.ID, &globalConfig.DBPath, &globalConfig.OrderProcPeriodInSec, &globalConfig.CreatedAt,
+		&globalConfig.UpdatedAt,
 
-		&globalConfig.Admin.ID, &globalConfig.Admin.Exchange, &globalConfig.Admin.Username, &globalConfig.Admin.SecretToken,
+		&globalConfig.Admin.ID, &globalConfig.Admin.Exchange, &globalConfig.Admin.Username,
+		&globalConfig.Admin.SecretToken,
 		&globalConfig.Admin.Token,
 
-		&globalConfig.ExchangeAPISettings.ID, &globalConfig.ExchangeAPISettings.Exchange, &globalConfig.ExchangeAPISettings.Enable,
-		&globalConfig.ExchangeAPISettings.Test, &globalConfig.ExchangeAPISettings.PingSec, &globalConfig.ExchangeAPISettings.TimeoutSec,
-		&globalConfig.ExchangeAPISettings.RetrySec, &globalConfig.ExchangeAPISettings.BufferSize, &globalConfig.ExchangeAPISettings.Currency,
-		&globalConfig.ExchangeAPISettings.Symbol, &globalConfig.ExchangeAPISettings.OrderType, &globalConfig.ExchangeAPISettings.MaxAmount,
-		&globalConfig.ExchangeAPISettings.LimitContractsCount, &globalConfig.ExchangeAPISettings.SellOrderCoef, &globalConfig.ExchangeAPISettings.BuyOrderCoef,
+		&globalConfig.ExchangeAPISettings.ID, &globalConfig.ExchangeAPISettings.Exchange,
+		&globalConfig.ExchangeAPISettings.Enable, &globalConfig.ExchangeAPISettings.Test,
+		&globalConfig.ExchangeAPISettings.PingSec, &globalConfig.ExchangeAPISettings.TimeoutSec,
+		&globalConfig.ExchangeAPISettings.RetrySec, &globalConfig.ExchangeAPISettings.BufferSize,
+		&globalConfig.ExchangeAPISettings.Currency, &globalConfig.ExchangeAPISettings.Symbol,
+		&globalConfig.ExchangeAPISettings.OrderType, &globalConfig.ExchangeAPISettings.MaxAmount,
+		&globalConfig.ExchangeAPISettings.LimitContractsCount, &globalConfig.ExchangeAPISettings.SellOrderCoef,
+		&globalConfig.ExchangeAPISettings.BuyOrderCoef,
 
-		&globalConfig.ExchangeAccess.ID, &globalConfig.ExchangeAccess.Exchange, &globalConfig.ExchangeAccess.Test, &globalConfig.ExchangeAccess.Key, &globalConfig.ExchangeAccess.Secret,
+		&globalConfig.ExchangeAccess.ID, &globalConfig.ExchangeAccess.Exchange, &globalConfig.ExchangeAccess.Test,
+		&globalConfig.ExchangeAccess.Key, &globalConfig.ExchangeAccess.Secret,
 
-		&globalConfig.Scheduler.ID, &globalConfig.Scheduler.Type, &globalConfig.Scheduler.Enable, &globalConfig.Scheduler.PriceTrailing, &globalConfig.Scheduler.ProfitCloseBTC,
-		&globalConfig.Scheduler.LossCloseBTC, &globalConfig.Scheduler.ProfitPnlDiff, &globalConfig.Scheduler.LossPnlDiff,
+		&globalConfig.Scheduler.ID, &globalConfig.Scheduler.Type, &globalConfig.Scheduler.Enable,
+		&globalConfig.Scheduler.PriceTrailing, &globalConfig.Scheduler.ProfitCloseBTC,
+		&globalConfig.Scheduler.LossCloseBTC, &globalConfig.Scheduler.ProfitPnlDiff,
+		&globalConfig.Scheduler.LossPnlDiff,
 
-		&globalConfig.StrategiesConfig.ID, &globalConfig.StrategiesConfig.Bin, &globalConfig.StrategiesConfig.EnableRSIBB, &globalConfig.StrategiesConfig.RetryProcessCount,
-		&globalConfig.StrategiesConfig.GetCandlesCount, &globalConfig.StrategiesConfig.TrendFilterEnable, &globalConfig.StrategiesConfig.CandlesFilterEnable,
-		&globalConfig.StrategiesConfig.MaxFilterTrendCount, &globalConfig.StrategiesConfig.MaxCandlesFilterCount, &globalConfig.StrategiesConfig.BBLastCandlesCount,
-		&globalConfig.StrategiesConfig.RsiCount, &globalConfig.StrategiesConfig.RsiMinBorder, &globalConfig.StrategiesConfig.RsiMaxBorder, &globalConfig.StrategiesConfig.RsiTradeCoef,
-		&globalConfig.StrategiesConfig.MacdFastCount, &globalConfig.StrategiesConfig.MacdSlowCount, &globalConfig.StrategiesConfig.MacdSigCount,
+		&globalConfig.StrategiesConfig.ID, &globalConfig.StrategiesConfig.Bin,
+		&globalConfig.StrategiesConfig.EnableRSIBB, &globalConfig.StrategiesConfig.RetryProcessCount,
+		&globalConfig.StrategiesConfig.GetCandlesCount, &globalConfig.StrategiesConfig.TrendFilterEnable,
+		&globalConfig.StrategiesConfig.CandlesFilterEnable, &globalConfig.StrategiesConfig.MaxFilterTrendCount,
+		&globalConfig.StrategiesConfig.MaxCandlesFilterCount, &globalConfig.StrategiesConfig.BBLastCandlesCount,
+		&globalConfig.StrategiesConfig.RsiCount, &globalConfig.StrategiesConfig.RsiMinBorder,
+		&globalConfig.StrategiesConfig.RsiMaxBorder, &globalConfig.StrategiesConfig.RsiTradeCoef,
+		&globalConfig.StrategiesConfig.MacdFastCount, &globalConfig.StrategiesConfig.MacdSlowCount,
+		&globalConfig.StrategiesConfig.MacdSigCount,
 	)
 	if err != nil {
 		return nil, err

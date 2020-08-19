@@ -136,11 +136,35 @@ func (b *Bitmex) SendRequest(path string, params url.Values, response interface{
 	})
 }
 
+func (b *Bitmex) checkParams(params interface{}, uri, path string) (data, newURI, newPath string, err error) {
+	json := jsoniter.ConfigCompatibleWithStandardLibrary
+
+	if params == nil {
+		return data, uri, path, nil
+	}
+
+	if urlValues, ok := params.(url.Values); !ok {
+		bData, err := json.Marshal(params)
+		if err != nil {
+			return "", "", "", err
+		}
+		data = string(bData)
+		if b.verbose {
+			b.logger.Infof("request params: %s", data)
+		}
+	} else {
+		encodeParams := urlValues.Encode()
+		path += "?" + encodeParams
+		uri += "?" + encodeParams
+	}
+	newURI = uri
+	newPath = path
+	return
+}
+
 func (b *Bitmex) SendAuthenticatedRequest(
 	verb, path string, params, response interface{},
 ) error {
-	json := jsoniter.ConfigCompatibleWithStandardLibrary
-
 	if err := b.validateRequest(); err != nil {
 		return err
 	}
@@ -154,25 +178,13 @@ func (b *Bitmex) SendAuthenticatedRequest(
 	headers["api-expires"] = timestampNew
 	headers["api-key"] = b.key
 
-	var data string
 	var uri = b.url + path
-	if params != nil {
-		if urlValues, ok := params.(url.Values); !ok {
-			bData, err := json.Marshal(params)
-			if err != nil {
-				return err
-			}
-			data = string(bData)
-			if b.verbose {
-				b.logger.Infof("request params: %s", data)
-			}
-		} else {
-			encodeParams := urlValues.Encode()
-			path += "?" + encodeParams
-			uri += "?" + encodeParams
 
-		}
+	data, uri, path, err := b.checkParams(params, uri, path)
+	if err != nil {
+		return err
 	}
+
 	hmac := crypto.GetHashMessage(crypto.HashSHA256,
 		[]byte(verb+"/api/v1"+path+timestampNew+data),
 		[]byte(b.secret))

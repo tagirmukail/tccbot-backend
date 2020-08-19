@@ -180,7 +180,8 @@ func (o *OrderProcessor) GetBalance() (walletBalance, availableBalance float64, 
 		}
 	}
 
-	return 0, 0, fmt.Errorf("user margin by currency:%s not exist", cfg.ExchangesSettings.Bitmex.Currency)
+	return 0, 0, fmt.Errorf("user margin by currency:%s not exist",
+		cfg.ExchangesSettings.Bitmex.Currency)
 }
 
 func (o *OrderProcessor) getInstrument(cfg *config.GlobalConfig) (bitmex.Instrument, error) {
@@ -241,7 +242,9 @@ func (o *OrderProcessor) checkLimitContracts(cfg *config.GlobalConfig, side type
 }
 
 // calcOrderQty in contracts
-func (o *OrderProcessor) calcOrderQty(cfg *config.GlobalConfig, balance float64, side types.Side) (qtyContrts float64, err error) {
+func (o *OrderProcessor) calcOrderQty(
+	cfg *config.GlobalConfig, balance float64, side types.Side,
+) (qtyContrts float64, err error) {
 	position, ok := o.GetPosition()
 	if ok {
 		if position.CurrentQty > 0 {

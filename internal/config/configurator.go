@@ -16,19 +16,19 @@ import (
 )
 
 type Configurator struct {
-	cfgFile      string
-	db           db.DatabaseManager
-	mx           sync.Mutex
-	cfg          *GlobalConfig
-	updPeriodSec time.Duration
+	cfgFile           string
+	db                db.DatabaseManager
+	mx                sync.Mutex
+	cfg               *GlobalConfig
+	updPeriodInSecond time.Duration
 }
 
-func NewConfigurator(cfgFile string, updPeriodSec time.Duration) (*Configurator, error) {
+func NewConfigurator(cfgFile string, updPeriodInSecond time.Duration) (*Configurator, error) {
 
 	cfgurtr := &Configurator{
-		cfgFile:      cfgFile,
-		mx:           sync.Mutex{},
-		updPeriodSec: updPeriodSec,
+		cfgFile:           cfgFile,
+		mx:                sync.Mutex{},
+		updPeriodInSecond: updPeriodInSecond,
 	}
 
 	err := cfgurtr.parseConfig(cfgFile)

@@ -70,27 +70,28 @@ type ExchangeAPISettings struct {
 }
 
 type StrategiesConfig struct {
-	ID                int     `db:"id" json:"id"`
-	EnableRSIBB       bool    `json:"enable_rsi_bb" db:"enable_rsi_bb"`
-	Bin               BinSize `json:"bin" db:"bin"`
-	RetryProcessCount int     `json:"retry_process_count" db:"retry_process_count"`
-	GetCandlesCount   int     `json:"get_candles_count" db:"get_candles_count"`
+	EnableRSIBB         bool    `json:"enable_rsi_bb" db:"enable_rsi_bb"`
+	TrendFilterEnable   bool    `json:"trend_filter_enable" db:"trend_filter_enable"`
+	CandlesFilterEnable bool    `json:"candles_filter_enable" db:"candles_filter_enable"`
+	Bin                 BinSize `json:"bin" db:"bin"`
+	RsiMinBorder        uint32  `json:"rsi_min_border" db:"rsi_min_border"`
+	RsiMaxBorder        uint32  `json:"rsi_max_border" db:"rsi_max_border"`
+	ID                  int     `db:"id" json:"id"`
+	RetryProcessCount   int     `json:"retry_process_count" db:"retry_process_count"`
+	GetCandlesCount     int     `json:"get_candles_count" db:"get_candles_count"`
 
-	TrendFilterEnable     bool `json:"trend_filter_enable" db:"trend_filter_enable"`
-	CandlesFilterEnable   bool `json:"candles_filter_enable" db:"candles_filter_enable"`
-	MaxFilterTrendCount   int  `json:"max_filter_trend_count" db:"max_filter_trend_count"`
-	MaxCandlesFilterCount int  `json:"max_candles_filter_count" db:"max_candles_filter_count"`
+	MaxFilterTrendCount   int `json:"max_filter_trend_count" db:"max_filter_trend_count"`
+	MaxCandlesFilterCount int `json:"max_candles_filter_count" db:"max_candles_filter_count"`
 
 	BBLastCandlesCount int `json:"bb_last_candles_count" db:"bb_last_candles_count"`
 
-	RsiCount     int     `json:"rsi_count" db:"rsi_count"`
-	RsiMinBorder uint32  `json:"rsi_min_border" db:"rsi_min_border"`
-	RsiMaxBorder uint32  `json:"rsi_max_border" db:"rsi_max_border"`
-	RsiTradeCoef float64 `json:"rsi_trade_coef" db:"rsi_trade_coef"`
+	RsiCount int `json:"rsi_count" db:"rsi_count"`
 
 	MacdFastCount int `json:"macd_fast_count" db:"macd_fast_count"`
 	MacdSlowCount int `json:"macd_slow_count" db:"macd_slow_count"`
 	MacdSigCount  int `json:"macd_sig_count" db:"macd_sig_count"`
 
 	GlobalID int `json:"global_id" db:"global_id"`
+
+	RsiTradeCoef float64 `json:"rsi_trade_coef" db:"rsi_trade_coef"`
 }

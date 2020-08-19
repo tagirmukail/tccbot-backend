@@ -124,7 +124,9 @@ func (s *BBRSIStrategy) Execute(_ context.Context, size models.BinSize) error {
 	return placeBitmexOrder(s.orderProc, applySide, true, s.log)
 }
 
-func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize) types.Side {
+func (s *BBRSIStrategy) ApplyFilters(
+	action stratypes.Action, candles []bitmex.TradeBuck, size models.BinSize,
+) types.Side {
 	if len(s.filters) == 0 {
 		s.log.Warnf("filters not installed")
 		switch action {
@@ -149,7 +151,9 @@ func (s *BBRSIStrategy) ApplyFilters(action stratypes.Action, candles []bitmex.T
 	return applySide
 }
 
-func (s *BBRSIStrategy) processRsi(scfg *config.GlobalConfig, candles []bitmex.TradeBuck, size models.BinSize) (rsi trademath.RSI, err error) {
+func (s *BBRSIStrategy) processRsi(
+	scfg *config.GlobalConfig, candles []bitmex.TradeBuck, size models.BinSize,
+) (rsi trademath.RSI, err error) {
 	s.log.Infof("start process rsi signal")
 	defer s.log.Infof("finish process rsi signal")
 

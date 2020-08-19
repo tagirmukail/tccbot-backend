@@ -1,13 +1,13 @@
 package config
 
 type StrategiesConfig struct {
-	EnableMACD        bool
-	EnableRSIBB       bool
-	RetryProcessCount int
-	GetCandlesCount   int
+	EnableMACD          bool
+	EnableRSIBB         bool
+	TrendFilterEnable   bool
+	CandlesFilterEnable bool
+	RetryProcessCount   int
+	GetCandlesCount     int
 
-	TrendFilterEnable     bool
-	CandlesFilterEnable   bool
 	MaxFilterTrendCount   int
 	MaxCandlesFilterCount int
 
